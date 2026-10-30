@@ -42,6 +42,7 @@ type ArchiveTarget =
   | { kind: 'account'; item: Account };
 
 interface CatalogSheetProps {
+  ledgerId: string;
   initialTab: CatalogTab;
   catalog: Catalog;
   onCatalogChange: (catalog: Catalog) => void;
@@ -60,7 +61,7 @@ function accountsOf(catalog: Catalog, archived: boolean): Account[] {
   return sortByOrder(catalog.accounts.filter((account) => account.archived === archived));
 }
 
-export function CatalogSheet({ initialTab, catalog, onCatalogChange, onClose }: CatalogSheetProps) {
+export function CatalogSheet({ ledgerId, initialTab, catalog, onCatalogChange, onClose }: CatalogSheetProps) {
   const client = useMemo(() => getLedgerClient(), []);
   const { showToast } = useToast();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -152,8 +153,8 @@ export function CatalogSheet({ initialTab, catalog, onCatalogChange, onClose }: 
     try {
       const next =
         kind === 'category'
-          ? await client.call('updateCategory', { id: item.id, patch: { archived: false } })
-          : await client.call('updateAccount', { id: item.id, patch: { archived: false } });
+          ? await client.call('updateCategory', { ledgerId, id: item.id, patch: { archived: false } })
+          : await client.call('updateAccount', { ledgerId, id: item.id, patch: { archived: false } });
       onCatalogChange(next);
       showToast(`已恢复${kind === 'category' ? '分类' : '账户'}“${item.name}”`, 'success');
     } catch (reason) {
@@ -182,8 +183,8 @@ export function CatalogSheet({ initialTab, catalog, onCatalogChange, onClose }: 
     try {
       const next =
         target.kind === 'category'
-          ? await client.call('updateCategory', { id: target.item.id, patch: { archived: true } })
-          : await client.call('updateAccount', { id: target.item.id, patch: { archived: true } });
+          ? await client.call('updateCategory', { ledgerId, id: target.item.id, patch: { archived: true } })
+          : await client.call('updateAccount', { ledgerId, id: target.item.id, patch: { archived: true } });
       onCatalogChange(next);
       showToast(`已归档${label}“${target.item.name}”`, 'success');
       closeArchiveDialog();
@@ -336,6 +337,7 @@ export function CatalogSheet({ initialTab, catalog, onCatalogChange, onClose }: 
             <div className="settings-sheet__formarea">
               <CatalogItemForm
                 key={form.id ?? `new-${form.kind}`}
+                ledgerId={ledgerId}
                 state={form}
                 onCancel={() => setForm(null)}
                 onSaved={handleFormSaved}
@@ -517,12 +519,13 @@ export function CatalogSheet({ initialTab, catalog, onCatalogChange, onClose }: 
 }
 
 interface CatalogItemFormProps {
+  ledgerId: string;
   state: CatalogFormState;
   onCancel: () => void;
   onSaved: (catalog: Catalog, message: string) => void;
 }
 
-function CatalogItemForm({ state, onCancel, onSaved }: CatalogItemFormProps) {
+function CatalogItemForm({ ledgerId, state, onCancel, onSaved }: CatalogItemFormProps) {
   const client = useMemo(() => getLedgerClient(), []);
   const nameId = useId();
   const [name, setName] = useState(state.name);
@@ -564,22 +567,30 @@ function CatalogItemForm({ state, onCancel, onSaved }: CatalogItemFormProps) {
       if (state.kind === 'category') {
         if (state.id) {
           const next = await client.call('updateCategory', {
+            ledgerId,
             id: state.id,
             patch: { name: trimmed, icon, color },
           });
           onSaved(next, '分类已更新');
         } else {
-          const next = await client.call('addCategory', { name: trimmed, type, icon, color });
+          const next = await client.call('addCategory', {
+            ledgerId,
+            category: { name: trimmed, type, icon, color },
+          });
           onSaved(next, '已新增分类');
         }
       } else if (state.id) {
         const next = await client.call('updateAccount', {
+          ledgerId,
           id: state.id,
           patch: { name: trimmed, icon, color },
         });
         onSaved(next, '账户已更新');
       } else {
-        const next = await client.call('addAccount', { name: trimmed, icon, color });
+        const next = await client.call('addAccount', {
+          ledgerId,
+          account: { name: trimmed, icon, color },
+        });
         onSaved(next, '已新增账户');
       }
     } catch (reason) {

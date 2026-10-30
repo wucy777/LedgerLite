@@ -1,6 +1,9 @@
 import { indexedDB } from 'fake-indexeddb';
 import { LedgerEngine } from '../../src/backend/engine';
+import { DEFAULT_LEDGER_ID } from '../../src/shared/defaults';
 import type { Entry, EntryDraft } from '../../src/shared/types';
+
+export { DEFAULT_LEDGER_ID };
 
 let sequence = 0;
 
@@ -81,12 +84,20 @@ export function incomeDraft(overrides: Partial<EntryDraft> = {}): EntryDraft {
   };
 }
 
-export async function saveExpense(engine: LedgerEngine, overrides: Partial<EntryDraft> = {}): Promise<Entry> {
-  return engine.saveEntry({ draft: expenseDraft(overrides) });
+export async function saveExpense(
+  engine: LedgerEngine,
+  ledgerId: string = DEFAULT_LEDGER_ID,
+  overrides: Partial<EntryDraft> = {},
+): Promise<Entry> {
+  return engine.saveEntry({ ledgerId, draft: expenseDraft(overrides) });
 }
 
-export async function saveIncome(engine: LedgerEngine, overrides: Partial<EntryDraft> = {}): Promise<Entry> {
-  return engine.saveEntry({ draft: incomeDraft(overrides) });
+export async function saveIncome(
+  engine: LedgerEngine,
+  ledgerId: string = DEFAULT_LEDGER_ID,
+  overrides: Partial<EntryDraft> = {},
+): Promise<Entry> {
+  return engine.saveEntry({ ledgerId, draft: incomeDraft(overrides) });
 }
 
 function requestResult<T>(request: IDBRequest<T>): Promise<T> {

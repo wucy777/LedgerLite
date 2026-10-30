@@ -46,6 +46,7 @@ function AboutSection({ version, crypto }: AboutSectionProps) {
 }
 
 export function SettingsPage({
+  ledgerId,
   version,
   crypto,
   catalog,
@@ -70,12 +71,17 @@ export function SettingsPage({
       <div className="settings-layout">
         <EncryptionSection crypto={crypto} onSessionChange={onSessionChange} onLock={onLock} />
         <DataSection
+          ledgerId={ledgerId}
           encrypted={crypto.enabled}
           onCatalogChange={onCatalogChange}
           onSessionChange={onSessionChange}
           onDataChanged={onDataChanged}
         />
-        <CatalogSection catalog={catalog} onCatalogChange={onCatalogChange} />
+        <CatalogSection
+          ledgerId={ledgerId}
+          catalog={catalog}
+          onCatalogChange={onCatalogChange}
+        />
         <AboutSection version={version} crypto={crypto} />
       </div>
     </div>

@@ -1,6 +1,6 @@
 export const APP_NAME = '简账';
 export const APP_VERSION = '0.1.0-beta';
-export const BACKUP_SCHEMA = 1;
+export const BACKUP_SCHEMA = 2;
 
 export const ENTRY_TYPES = ['expense', 'income'] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
@@ -55,6 +55,16 @@ export interface Catalog {
   accounts: Account[];
 }
 
+export interface Ledger {
+  id: string;
+  name: string;
+  /** Accent color used by the ledger selector. */
+  color: string;
+  createdAt: string;
+  updatedAt: string;
+  sort: number;
+}
+
 export interface Entry {
   id: string;
   type: EntryType;
@@ -105,6 +115,7 @@ export interface CategoryTotal {
 }
 
 export interface MonthStats {
+  ledgerId: string;
   month: string;
   expenseCents: number;
   incomeCents: number;
@@ -127,23 +138,35 @@ export interface CryptoState {
 export interface InitResult {
   status: 'locked' | 'ready';
   crypto: CryptoState;
+  /** All available ledgers, sorted by their manual order. Empty while locked. */
+  ledgers: Ledger[];
+  /** The ledger paired with `catalog` (the first ledger after a fresh load). */
+  ledger: Ledger | null;
   catalog: Catalog | null;
   version: string;
 }
 
+export interface LedgerData {
+  ledger: Ledger;
+  catalog: Catalog;
+}
+
 export interface MonthQuery {
+  ledgerId: string;
   month: string;
   search?: string;
   type?: EntryFilter;
 }
 
 export interface MonthResult {
+  ledgerId: string;
   month: string;
   entries: Entry[];
   summary: MonthSummary;
 }
 
 export interface SaveEntryInput {
+  ledgerId: string;
   id?: string;
   draft: EntryDraft;
 }
@@ -177,9 +200,11 @@ export interface AccountPatch {
 
 export interface BackupPayload {
   app: 'ledgerlite';
-  schema: 1;
+  schema: 1 | 2;
   version: string;
   exportedAt: string;
+  /** Present in schema 2 backups. */
+  ledgerName?: string;
   entries: Entry[];
   catalog: Catalog;
 }
@@ -214,16 +239,20 @@ export interface StorageApi {
   lock: { params: void; result: InitResult };
   enableEncryption: { params: { passphrase: string }; result: InitResult };
   disableEncryption: { params: { passphrase: string }; result: InitResult };
+  openLedger: { params: { ledgerId: string }; result: LedgerData };
+  createLedger: { params: { name: string }; result: InitResult & { ledger: Ledger; catalog: Catalog } };
+  updateLedger: { params: { id: string; name: string }; result: Ledger };
+  deleteLedger: { params: { id: string }; result: { ledgers: Ledger[] } };
   listMonth: { params: MonthQuery; result: MonthResult };
-  getStats: { params: { month: string }; result: MonthStats };
+  getStats: { params: { ledgerId: string; month: string }; result: MonthStats };
   saveEntry: { params: SaveEntryInput; result: Entry };
-  deleteEntry: { params: { id: string }; result: void };
-  addCategory: { params: CategoryInput; result: Catalog };
-  updateCategory: { params: { id: string; patch: CategoryPatch }; result: Catalog };
-  addAccount: { params: AccountInput; result: Catalog };
-  updateAccount: { params: { id: string; patch: AccountPatch }; result: Catalog };
-  exportBackup: { params: void; result: BackupPayload };
-  importBackup: { params: { backup: unknown }; result: ImportResult };
+  deleteEntry: { params: { ledgerId: string; id: string }; result: void };
+  addCategory: { params: { ledgerId: string; category: CategoryInput }; result: Catalog };
+  updateCategory: { params: { ledgerId: string; id: string; patch: CategoryPatch }; result: Catalog };
+  addAccount: { params: { ledgerId: string; account: AccountInput }; result: Catalog };
+  updateAccount: { params: { ledgerId: string; id: string; patch: AccountPatch }; result: Catalog };
+  exportBackup: { params: { ledgerId: string }; result: BackupPayload };
+  importBackup: { params: { ledgerId: string; backup: unknown }; result: ImportResult };
   resetAll: { params: void; result: InitResult };
 }
 

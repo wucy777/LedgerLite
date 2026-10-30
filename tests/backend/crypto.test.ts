@@ -2,7 +2,7 @@ import { indexedDB } from 'fake-indexeddb';
 import { afterEach, describe, expect, it } from 'vitest';
 import { LedgerEngine } from '../../src/backend/engine';
 import { type Entry } from '../../src/shared/types';
-import { createEngine, deleteDatabase, expenseDraft, incomeDraft, localIso, rawGet, rawGetAll, rawPut, tickClock } from './helpers';
+import { DEFAULT_LEDGER_ID, createEngine, deleteDatabase, expenseDraft, incomeDraft, localIso, rawGet, rawGetAll, rawPut, tickClock } from './helpers';
 
 interface RawEntryRecord {
   id: string;
@@ -47,9 +47,11 @@ describe('加密生命周期', () => {
   it('启用加密后重写 entries 与 catalog，每条记录使用独立 IV 与 HMAC monthTag', async () => {
     const { engine, dbName } = await setup();
     const first = await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
       draft: expenseDraft({ note: '测试午餐', occurredAt: localIso(2026, 3, 5, 12) }),
     });
     const second = await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
       draft: expenseDraft({ note: '测试午餐', occurredAt: localIso(2026, 3, 6, 12) }),
     });
 
@@ -71,27 +73,33 @@ describe('加密生命周期', () => {
     expect(ivs[0]).not.toEqual(ivs[1]);
     expect(JSON.stringify(records)).not.toContain('测试午餐');
 
-    const catalog = await rawGet<RawCatalogRecord>(dbName, 'kv', 'catalog');
+    const catalog = await rawGet<RawCatalogRecord>(dbName, 'kv', 'catalog:' + DEFAULT_LEDGER_ID);
     expect(catalog?.payload.encrypted).toBe(true);
     expect(JSON.stringify(catalog)).not.toContain('餐饮');
 
     // Both records remain readable while unlocked and use stable HMAC month tags.
-    const month = await engine.listMonth({ month: '2026-03' });
+    const month = await engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03' });
     expect(month.entries.map((entry) => entry.id).sort()).toEqual([first.id, second.id].sort());
   });
 
   it('锁定后拒绝数据访问，错误口令无法解锁，正确口令恢复全部数据', async () => {
     const { engine, dbName } = await setup();
-    const saved = await engine.saveEntry({ draft: expenseDraft({ note: '秘密午餐', occurredAt: localIso(2026, 3, 5) }) });
+    const saved = await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
+      draft: expenseDraft({ note: '秘密午餐', occurredAt: localIso(2026, 3, 5) }) });
     await engine.enableEncryption('pass-1234');
 
     const locked = await engine.lock();
     expect(locked.status).toBe('locked');
     expect(locked.catalog).toBeNull();
     expect(locked.crypto).toEqual({ enabled: true, unlocked: false });
-    await expect(engine.listMonth({ month: '2026-03' })).rejects.toMatchObject({ code: 'LOCKED' });
-    await expect(engine.getStats('2026-03')).rejects.toMatchObject({ code: 'LOCKED' });
-    await expect(engine.exportBackup()).rejects.toMatchObject({ code: 'LOCKED' });
+    await expect(engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03' })).rejects.toMatchObject({ code: 'LOCKED' });
+    await expect(engine.getStats(DEFAULT_LEDGER_ID, '2026-03')).rejects.toMatchObject({ code: 'LOCKED' });
+    await expect(engine.exportBackup(DEFAULT_LEDGER_ID)).rejects.toMatchObject({ code: 'LOCKED' });
 
     await expect(engine.unlock('wrong')).rejects.toMatchObject({ code: 'INVALID_PASSPHRASE' });
     expect((await engine.initialize()).status).toBe('locked');
@@ -102,7 +110,9 @@ describe('加密生命周期', () => {
     const unlocked = await reopened.engine.unlock('pass-1234');
     expect(unlocked.status).toBe('ready');
     expect(unlocked.catalog?.categories).toHaveLength(15);
-    const month = await reopened.engine.listMonth({ month: '2026-03' });
+    const month = await reopened.engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03' });
     expect(month.entries).toHaveLength(1);
     expect(month.entries[0]?.id).toBe(saved.id);
     expect(month.entries[0]?.note).toBe('秘密午餐');
@@ -111,6 +121,7 @@ describe('加密生命周期', () => {
   it('禁用加密还原明文，错误口令不改变加密状态', async () => {
     const { engine, dbName } = await setup();
     const saved = await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
       draft: expenseDraft({ note: '还原我', amountCents: 4321, occurredAt: localIso(2026, 3, 5) }),
     });
     await engine.enableEncryption('secret');
@@ -128,14 +139,18 @@ describe('加密生命周期', () => {
     expect(plain?.payload.value?.note).toBe('还原我');
     expect(plain?.monthTag).toBe('2026-03');
     expect(await rawGet(dbName, 'kv', 'crypto')).toBeUndefined();
-    const catalog = await rawGet<RawCatalogRecord>(dbName, 'kv', 'catalog');
+    const catalog = await rawGet<RawCatalogRecord>(dbName, 'kv', 'catalog:' + DEFAULT_LEDGER_ID);
     expect(catalog?.payload.encrypted).toBe(false);
-    expect((await engine.listMonth({ month: '2026-03' })).entries[0]?.amountCents).toBe(4321);
+    expect((await engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03' })).entries[0]?.amountCents).toBe(4321);
   });
 
   it('拒绝篡改后的密文', async () => {
     const { engine, dbName } = await setup();
-    const saved = await engine.saveEntry({ draft: expenseDraft({ occurredAt: localIso(2026, 3, 5) }) });
+    const saved = await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
+      draft: expenseDraft({ occurredAt: localIso(2026, 3, 5) }) });
     await engine.enableEncryption('secret');
     const record = await rawGet<RawEntryRecord>(dbName, 'entries', saved.id);
     expect(record?.payload.encrypted).toBe(true);
@@ -147,13 +162,19 @@ describe('加密生命周期', () => {
       ...record,
       payload: { ...record?.payload, data: tampered.buffer },
     });
-    await expect(engine.listMonth({ month: '2026-03' })).rejects.toMatchObject({ code: 'INVALID_PASSPHRASE' });
+    await expect(engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03' })).rejects.toMatchObject({ code: 'INVALID_PASSPHRASE' });
   });
 
   it('AAD 绑定记录 id 与 monthTag，换绑后的密文无法解密', async () => {
     const { engine, dbName } = await setup();
-    const first = await engine.saveEntry({ draft: expenseDraft({ note: '第一条', occurredAt: localIso(2026, 3, 5) }) });
-    const second = await engine.saveEntry({ draft: expenseDraft({ note: '第二条', occurredAt: localIso(2026, 3, 6) }) });
+    const first = await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
+      draft: expenseDraft({ note: '第一条', occurredAt: localIso(2026, 3, 5) }) });
+    const second = await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
+      draft: expenseDraft({ note: '第二条', occurredAt: localIso(2026, 3, 6) }) });
     await engine.enableEncryption('secret');
     const firstRecord = await rawGet<RawEntryRecord>(dbName, 'entries', first.id);
     const secondRecord = await rawGet<RawEntryRecord>(dbName, 'entries', second.id);
@@ -161,38 +182,56 @@ describe('加密生命周期', () => {
 
     // Move the ciphertext of the second entry under the first entry id.
     await rawPut(dbName, 'entries', { ...firstRecord, payload: secondRecord?.payload });
-    await expect(engine.listMonth({ month: '2026-03' })).rejects.toMatchObject({ code: 'INVALID_PASSPHRASE' });
+    await expect(engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03' })).rejects.toMatchObject({ code: 'INVALID_PASSPHRASE' });
   });
 
   it('加密状态下搜索、统计、增删改与导出均正常', async () => {
     const { engine } = await setup();
-    await engine.saveEntry({ draft: expenseDraft({ note: 'Coffee', amountCents: 1500, occurredAt: localIso(2026, 3, 2) }) });
     await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
+      draft: expenseDraft({ note: 'Coffee', amountCents: 1500, occurredAt: localIso(2026, 3, 2) }) });
+    await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
       draft: expenseDraft({ note: '打车', categoryId: 'cat_transport', amountCents: 800, occurredAt: localIso(2026, 3, 3) }),
     });
-    await engine.saveEntry({ draft: incomeDraft({ note: '工资', occurredAt: localIso(2026, 3, 5) }) });
+    await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
+      draft: incomeDraft({ note: '工资', occurredAt: localIso(2026, 3, 5) }) });
     await engine.enableEncryption('secret');
 
-    expect((await engine.listMonth({ month: '2026-03', search: 'coffee' })).entries).toHaveLength(1);
-    expect((await engine.listMonth({ month: '2026-03', search: '交通' })).entries).toHaveLength(1);
-    const stats = await engine.getStats('2026-03');
+    expect((await engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03', search: 'coffee' })).entries).toHaveLength(1);
+    expect((await engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03', search: '交通' })).entries).toHaveLength(1);
+    const stats = await engine.getStats(DEFAULT_LEDGER_ID, '2026-03');
     expect(stats.expenseCents).toBe(2300);
     expect(stats.daily).toHaveLength(31);
 
     const added = await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
       draft: expenseDraft({ note: '新增加密记录', amountCents: 200, occurredAt: localIso(2026, 3, 10) }),
     });
-    expect((await engine.listMonth({ month: '2026-03', search: '新增' })).entries[0]?.id).toBe(added.id);
-    const backup = await engine.exportBackup();
+    expect((await engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03', search: '新增' })).entries[0]?.id).toBe(added.id);
+    const backup = await engine.exportBackup(DEFAULT_LEDGER_ID);
     expect(backup.entries).toHaveLength(4);
     expect(backup.entries.some((entry) => entry.note === '新增加密记录')).toBe(true);
-    await engine.deleteEntry(added.id);
-    expect((await engine.listMonth({ month: '2026-03' })).entries).toHaveLength(3);
+    await engine.deleteEntry(DEFAULT_LEDGER_ID, added.id);
+    expect((await engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03' })).entries).toHaveLength(3);
   });
 
   it('加密开启时 resetAll 可在锁定状态执行并恢复未加密默认目录', async () => {
     const { engine, dbName } = await setup();
-    await engine.saveEntry({ draft: expenseDraft({ occurredAt: localIso(2026, 3, 5) }) });
+    await engine.saveEntry({
+      ledgerId: DEFAULT_LEDGER_ID,
+      draft: expenseDraft({ occurredAt: localIso(2026, 3, 5) }) });
     await engine.enableEncryption('secret');
     await engine.lock();
 
@@ -203,7 +242,9 @@ describe('加密生命周期', () => {
     expect(result.catalog?.accounts).toHaveLength(5);
     expect(await rawGetAll(dbName, 'entries')).toHaveLength(0);
     expect(await rawGet(dbName, 'kv', 'crypto')).toBeUndefined();
-    expect((await engine.listMonth({ month: '2026-03' })).entries).toHaveLength(0);
+    expect((await engine.listMonth({
+      ledgerId: DEFAULT_LEDGER_ID,
+      month: '2026-03' })).entries).toHaveLength(0);
 
     const reopened = await reopen(dbName);
     expect(reopened.init.status).toBe('ready');

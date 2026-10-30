@@ -375,3 +375,33 @@
     display: none;
   }
 }
+
+.app-header__actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.rail__ledger {
+  margin-bottom: 18px;
+}
+
+.rail__ledger .ledger-picker-trigger {
+  width: 100%;
+  justify-content: flex-start;
+}
+
+@media (max-width: 430px) {
+  .app-header__actions .local-badge--compact {
+    width: 30px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .local-badge--compact .local-badge__text {
+    display: none;
+  }
+}

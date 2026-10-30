@@ -1,6 +1,7 @@
 import type { Catalog, CryptoState, Entry, InitResult } from '@shared/types';
 
 export interface LedgerPageProps {
+  ledgerId: string;
   month: string;
   revision: number;
   catalog: Catalog;
@@ -10,12 +11,14 @@ export interface LedgerPageProps {
 }
 
 export interface StatsPageProps {
+  ledgerId: string;
   month: string;
   revision: number;
   onMonthChange: (month: string) => void;
 }
 
 export interface SettingsPageProps {
+  ledgerId: string;
   version: string;
   crypto: CryptoState;
   catalog: Catalog;
@@ -26,6 +29,7 @@ export interface SettingsPageProps {
 }
 
 export interface EntrySheetProps {
+  ledgerId: string;
   entry: Entry | null;
   catalog: Catalog;
   onClose: () => void;

@@ -5,6 +5,7 @@ import { Icon } from '../../components/Icon';
 import { CatalogSheet, type CatalogTab } from './CatalogSheet';
 
 interface CatalogSectionProps {
+  ledgerId: string;
   catalog: Catalog;
   onCatalogChange: (catalog: Catalog) => void;
 }
@@ -13,7 +14,7 @@ function sortByOrder<T extends { sort: number }>(items: readonly T[]): T[] {
   return [...items].sort((a, b) => a.sort - b.sort);
 }
 
-export function CatalogSection({ catalog, onCatalogChange }: CatalogSectionProps) {
+export function CatalogSection({ ledgerId, catalog, onCatalogChange }: CatalogSectionProps) {
   const [openTab, setOpenTab] = useState<CatalogTab | null>(null);
 
   const expenseCount = catalog.categories.filter((category) => category.type === 'expense' && !category.archived).length;
@@ -96,6 +97,7 @@ export function CatalogSection({ catalog, onCatalogChange }: CatalogSectionProps
 
       {openTab ? (
         <CatalogSheet
+          ledgerId={ledgerId}
           initialTab={openTab}
           catalog={catalog}
           onCatalogChange={onCatalogChange}

@@ -1,4 +1,20 @@
-import type { Account, Catalog, Category } from './types';
+import type { Account, Catalog, Category, Ledger } from './types';
+
+export const DEFAULT_LEDGER_ID = 'ledger_default';
+export const DEFAULT_LEDGER_NAME = '默认账本';
+export const LEDGER_COLORS = ['#2c4d39', '#8a6545', '#4f6f8f', '#7a5b83', '#a76a50', '#5e7869'] as const;
+
+export function createDefaultLedger(now = new Date(), sort = 0): Ledger {
+  const timestamp = now.toISOString();
+  return {
+    id: DEFAULT_LEDGER_ID,
+    name: DEFAULT_LEDGER_NAME,
+    color: '#2c4d39',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    sort,
+  };
+}
 
 const EXPENSE_CATEGORIES: ReadonlyArray<Omit<Category, 'type' | 'archived' | 'preset' | 'sort'>> = [
   { id: 'cat_food', name: '餐饮', icon: 'food', color: '#d96f52' },

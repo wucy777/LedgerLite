@@ -11,11 +11,11 @@ import { useAsyncResource } from '../hooks/useAsyncResource';
 import type { StatsPageProps } from '../types/page-props';
 import '../styles/stats.css';
 
-export function StatsPage({ month, revision, onMonthChange }: StatsPageProps) {
+export function StatsPage({ ledgerId, month, revision, onMonthChange }: StatsPageProps) {
   const client = getLedgerClient();
-  const load = useCallback(() => client.call('getStats', { month }), [client, month]);
-  const { data, status, error, reload } = useAsyncResource(load, [month, revision]);
-  const stats = data !== null && data.month === month ? data : null;
+  const load = useCallback(() => client.call('getStats', { ledgerId, month }), [client, ledgerId, month]);
+  const { data, status, error, reload } = useAsyncResource(load, [ledgerId, month, revision]);
+  const stats = data !== null && data.month === month && data.ledgerId === ledgerId ? data : null;
   const refreshing = status === 'loading' && stats !== null;
 
   return (

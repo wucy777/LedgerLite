@@ -1,4 +1,8 @@
-import { createDefaultCatalog } from '../shared/defaults';
+import {
+  createDefaultCatalog,
+  createDefaultLedger,
+  LEDGER_COLORS,
+} from '../shared/defaults';
 import { daysInMonth, localDateKey, monthKeyOfIso } from '../shared/date';
 import { MAX_AMOUNT_CENTS } from '../shared/money';
 import {
@@ -19,6 +23,8 @@ import {
   type IconName,
   type ImportResult,
   type InitResult,
+  type Ledger,
+  type LedgerData,
   type MonthQuery,
   type MonthResult,
   type MonthStats,
@@ -50,10 +56,19 @@ import {
   type EncryptedBlob,
   type Verifier,
 } from './crypto';
-import { ENTRY_STORE, KV_STORE, LedgerDatabase, MONTH_INDEX } from './db';
+import {
+  ENTRY_STORE,
+  KV_STORE,
+  LEDGER_INDEX,
+  LEDGER_MONTH_INDEX,
+  LEDGER_STORE,
+  LedgerDatabase,
+  catalogKey,
+} from './db';
 
 const NOTE_MAX_LENGTH = 120;
 const NAME_MAX_LENGTH = 12;
+const LEDGER_NAME_MAX_LENGTH = 20;
 const COLOR_PATTERN = /^#[0-9a-f]{6}$/i;
 
 export interface LedgerEngineOptions {
@@ -68,12 +83,13 @@ type StoredValue<T> = { encrypted: false; value: T } | ({ encrypted: true } & En
 
 interface EntryRecord {
   id: string;
+  ledgerId: string;
   monthTag: string;
   payload: StoredValue<Entry>;
 }
 
 interface CatalogRecord {
-  key: 'catalog';
+  key: string;
   payload: StoredValue<Catalog>;
 }
 
@@ -81,6 +97,11 @@ interface CryptoMetaRecord {
   key: 'crypto';
   salt: ArrayBuffer;
   verifier: Verifier;
+}
+
+interface DecodedEntry {
+  ledgerId: string;
+  entry: Entry;
 }
 
 function defaultGenerateId(): string {
@@ -94,6 +115,19 @@ function cloneCatalog(catalog: Catalog): Catalog {
     categories: catalog.categories.map((category) => ({ ...category })),
     accounts: catalog.accounts.map((account) => ({ ...account })),
   };
+}
+
+function cloneLedger(ledger: Ledger): Ledger {
+  return { ...ledger };
+}
+
+function sortLedgers(ledgers: readonly Ledger[]): Ledger[] {
+  return [...ledgers].sort((a, b) => {
+    if (a.sort !== b.sort) return a.sort - b.sort;
+    const created = Date.parse(a.createdAt) - Date.parse(b.createdAt);
+    if (created !== 0) return created;
+    return a.id.localeCompare(b.id);
+  });
 }
 
 function summarize(entries: readonly Entry[], month: string): MonthSummary {
@@ -154,6 +188,24 @@ function assertPassphrase(value: unknown): string {
   return value;
 }
 
+function requireLedgerId(value: unknown): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new LedgerError('VALIDATION', '账本 ID 无效');
+  }
+  return value;
+}
+
+/** Ledger names are slightly longer than catalog names because the UI budgets 20 characters. */
+function normalizeLedgerName(value: unknown): string {
+  if (typeof value !== 'string') throw new LedgerError('VALIDATION', '账本名称格式无效');
+  const trimmed = value.trim();
+  if (!trimmed) throw new LedgerError('VALIDATION', '名称不能为空');
+  if (Array.from(trimmed).length > LEDGER_NAME_MAX_LENGTH) {
+    throw new LedgerError('VALIDATION', `名称不能超过 ${LEDGER_NAME_MAX_LENGTH} 个字符`);
+  }
+  return trimmed;
+}
+
 function requireIcon(value: unknown): IconName {
   if (typeof value !== 'string' || value.length === 0) {
     throw new LedgerError('VALIDATION', '图标无效');
@@ -179,6 +231,13 @@ function requireText(value: unknown, label: string, maxLength: number): string {
   if (typeof value !== 'string') invalidImport(`${label}格式无效`);
   const trimmed = value.trim();
   if (!trimmed || trimmed.length > maxLength) invalidImport(`${label}格式无效`);
+  return trimmed;
+}
+
+function requireImportLedgerName(value: unknown): string {
+  if (typeof value !== 'string') invalidImport('账本名称格式无效');
+  const trimmed = value.trim();
+  if (!trimmed || Array.from(trimmed).length > LEDGER_NAME_MAX_LENGTH) invalidImport('账本名称格式无效');
   return trimmed;
 }
 
@@ -209,9 +268,14 @@ function requireIso(value: unknown, label: string): string {
 function parseBackup(value: unknown): BackupPayload {
   if (!isRecord(value)) invalidImport('备份数据格式无效');
   if (value.app !== 'ledgerlite') invalidImport('不是有效的备份文件');
-  if (value.schema !== 1) invalidImport('不支持的备份版本');
+  const rawSchema = value.schema;
+  if (rawSchema !== 1 && rawSchema !== 2) invalidImport('不支持的备份版本');
   if (typeof value.version !== 'string' || value.version.trim() === '') invalidImport('备份版本信息缺失');
   const exportedAt = requireIso(value.exportedAt, '导出时间');
+  let ledgerName: string | undefined;
+  if (value.ledgerName !== undefined) {
+    ledgerName = requireImportLedgerName(value.ledgerName);
+  }
   if (!Array.isArray(value.entries)) invalidImport('备份记录格式无效');
   if (!isRecord(value.catalog)) invalidImport('备份目录格式无效');
   const rawCategories = value.catalog.categories;
@@ -287,9 +351,10 @@ function parseBackup(value: unknown): BackupPayload {
 
   return {
     app: 'ledgerlite',
-    schema: 1,
+    schema: rawSchema,
     version: value.version,
     exportedAt,
+    ledgerName,
     entries,
     catalog: { categories, accounts },
   };
@@ -306,7 +371,9 @@ export class LedgerEngine {
   private initialized = false;
   private enabled = false;
   private keys: CryptoKeys | null = null;
-  private catalog: Catalog | null = null;
+  private ledgers: Ledger[] = [];
+  private catalogs = new Map<string, Catalog>();
+  private activeLedgerId: string | null = null;
 
   constructor(options: LedgerEngineOptions = {}) {
     const factory =
@@ -321,14 +388,14 @@ export class LedgerEngine {
     if (this.initialized) return this.currentInitResult();
     await this.database.open();
     const meta = await this.readCryptoMeta();
+    this.resetCaches();
     if (meta) {
       this.enabled = true;
       this.keys = null;
-      this.catalog = null;
     } else {
       this.enabled = false;
       this.keys = null;
-      await this.loadCatalog();
+      await this.loadReadyState();
     }
     this.initialized = true;
     return this.currentInitResult();
@@ -345,10 +412,10 @@ export class LedgerEngine {
     }
     this.keys = keys;
     try {
-      await this.loadCatalog();
+      await this.loadReadyState();
     } catch (error) {
       this.keys = null;
-      this.catalog = null;
+      this.resetCaches();
       throw error;
     }
     return this.currentInitResult();
@@ -358,7 +425,7 @@ export class LedgerEngine {
     if (!this.initialized) return this.initialize();
     if (!this.enabled) return this.currentInitResult();
     this.keys = null;
-    this.catalog = null;
+    this.resetCaches();
     return this.currentInitResult();
   }
 
@@ -366,20 +433,21 @@ export class LedgerEngine {
     await this.ensureReady();
     if (this.enabled) throw new LedgerError('CONFLICT', '已启用加密');
     const secret = assertPassphrase(passphrase);
-    const catalog = this.requireCatalog();
-    const entries = await this.loadAllEntries();
+    const ledgers = [...this.ledgers];
+    const catalogs = await Promise.all(ledgers.map((ledger) => this.getCatalog(ledger.id)));
+    const entries = await this.loadEntries();
     const salt = randomBytes(SALT_BYTES);
     const keys = await deriveKeys(secret, salt);
     const verifier = await createVerifier(keys);
-    const [catalogRecord, entryRecords] = await Promise.all([
-      this.encodeCatalog(catalog, keys),
-      Promise.all(entries.map((entry) => this.encodeEntry(entry, keys))),
+    const [catalogRecords, entryRecords] = await Promise.all([
+      Promise.all(ledgers.map((ledger, index) => this.encodeCatalog(ledger.id, catalogs[index] as Catalog, keys))),
+      Promise.all(entries.map(({ ledgerId, entry }) => this.encodeEntry(ledgerId, entry, keys))),
     ]);
     const meta: CryptoMetaRecord = { key: 'crypto', salt, verifier };
     await this.database.run([ENTRY_STORE, KV_STORE], 'readwrite', async (tx) => {
       await Promise.all([
         ...entryRecords.map((record) => tx.put(ENTRY_STORE, record)),
-        tx.put(KV_STORE, catalogRecord),
+        ...catalogRecords.map((record) => tx.put(KV_STORE, record)),
         tx.put(KV_STORE, meta),
       ]);
     });
@@ -397,16 +465,17 @@ export class LedgerEngine {
     if (!(await verifyVerifier(keys, meta.verifier))) {
       throw new LedgerError('INVALID_PASSPHRASE', '口令错误');
     }
-    const catalog = this.requireCatalog();
-    const entries = await this.loadAllEntries();
-    const [catalogRecord, entryRecords] = await Promise.all([
-      this.encodeCatalog(catalog, null),
-      Promise.all(entries.map((entry) => this.encodeEntry(entry, null))),
+    const ledgers = [...this.ledgers];
+    const catalogs = await Promise.all(ledgers.map((ledger) => this.getCatalog(ledger.id)));
+    const entries = await this.loadEntries();
+    const [catalogRecords, entryRecords] = await Promise.all([
+      Promise.all(ledgers.map((ledger, index) => this.encodeCatalog(ledger.id, catalogs[index] as Catalog, null))),
+      Promise.all(entries.map(({ ledgerId, entry }) => this.encodeEntry(ledgerId, entry, null))),
     ]);
     await this.database.run([ENTRY_STORE, KV_STORE], 'readwrite', async (tx) => {
       await Promise.all([
         ...entryRecords.map((record) => tx.put(ENTRY_STORE, record)),
-        tx.put(KV_STORE, catalogRecord),
+        ...catalogRecords.map((record) => tx.put(KV_STORE, record)),
         tx.delete(KV_STORE, 'crypto'),
       ]);
     });
@@ -415,19 +484,83 @@ export class LedgerEngine {
     return this.currentInitResult();
   }
 
+  async openLedger(ledgerId: string): Promise<LedgerData> {
+    await this.ensureReady();
+    const ledger = this.requireLedger(ledgerId);
+    const catalog = await this.getCatalog(ledger.id);
+    this.activeLedgerId = ledger.id;
+    return { ledger: cloneLedger(ledger), catalog: cloneCatalog(catalog) };
+  }
+
+  async createLedger(name: string): Promise<InitResult & { ledger: Ledger; catalog: Catalog }> {
+    await this.ensureReady();
+    const cleanName = normalizeLedgerName(name);
+    await this.ensureLedgerList();
+    const timestamp = this.now().toISOString();
+    const ledger: Ledger = {
+      id: `ledger_${this.generateId()}`,
+      name: cleanName,
+      color: LEDGER_COLORS[this.ledgers.length % LEDGER_COLORS.length] ?? LEDGER_COLORS[0],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      sort: nextSort(this.ledgers),
+    };
+    const catalog = createDefaultCatalog();
+    const record = await this.encodeCatalog(ledger.id, catalog, this.enabled ? this.requireKeys() : null);
+    await this.database.run([LEDGER_STORE, KV_STORE], 'readwrite', async (tx) => {
+      await tx.put(LEDGER_STORE, ledger);
+      await tx.put(KV_STORE, record);
+    });
+    this.ledgers = sortLedgers([...this.ledgers, ledger]);
+    this.catalogs.set(ledger.id, catalog);
+    this.activeLedgerId = ledger.id;
+    return { ...this.currentInitResult(), ledger: cloneLedger(ledger), catalog: cloneCatalog(catalog) };
+  }
+
+  async updateLedger(id: string, name: string): Promise<Ledger> {
+    await this.ensureReady();
+    const ledger = this.requireLedger(id);
+    const cleanName = normalizeLedgerName(name);
+    const updated: Ledger = { ...ledger, name: cleanName, updatedAt: this.now().toISOString() };
+    await this.database.run([LEDGER_STORE], 'readwrite', (tx) => tx.put(LEDGER_STORE, updated));
+    this.ledgers = this.ledgers.map((item) => (item.id === updated.id ? updated : item));
+    return cloneLedger(updated);
+  }
+
+  async deleteLedger(id: string): Promise<{ ledgers: Ledger[] }> {
+    await this.ensureReady();
+    const ledger = this.requireLedger(id);
+    if (this.ledgers.length <= 1) throw new LedgerError('CONFLICT', '至少保留一个账本');
+    await this.database.run([ENTRY_STORE, KV_STORE, LEDGER_STORE], 'readwrite', async (tx) => {
+      const keys = await tx.getAllKeysByIndex(ENTRY_STORE, LEDGER_INDEX, ledger.id);
+      await Promise.all(keys.map((key) => tx.delete(ENTRY_STORE, key)));
+      await tx.delete(KV_STORE, catalogKey(ledger.id));
+      await tx.delete(LEDGER_STORE, ledger.id);
+    });
+    this.ledgers = this.ledgers.filter((item) => item.id !== ledger.id);
+    this.catalogs.delete(ledger.id);
+    if (this.activeLedgerId === ledger.id) {
+      const next = this.ledgers[0] ?? null;
+      this.activeLedgerId = next?.id ?? null;
+      if (next) await this.getCatalog(next.id);
+    }
+    return { ledgers: this.ledgers.map(cloneLedger) };
+  }
+
   async listMonth(query: MonthQuery): Promise<MonthResult> {
     await this.ensureReady();
     if (!isRecord(query)) throw new LedgerError('VALIDATION', '查询参数无效');
     assertMonth(query.month);
+    const ledger = this.requireLedger(query.ledgerId);
     const filter: EntryFilter = query.type ?? 'all';
     if (filter !== 'all' && filter !== 'expense' && filter !== 'income') {
       throw new LedgerError('VALIDATION', '收支类型无效');
     }
-    const catalog = this.requireCatalog();
+    const catalog = await this.getCatalog(ledger.id);
     const categoryNames = new Map(catalog.categories.map((category) => [category.id, category.name]));
     const accountNames = new Map(catalog.accounts.map((account) => [account.id, account.name]));
     const needle = typeof query.search === 'string' ? query.search.trim().toLowerCase() : '';
-    const entries = (await this.loadMonthEntries(query.month))
+    const entries = (await this.loadMonthEntries(ledger.id, query.month))
       .filter((entry) => {
         if (filter !== 'all' && entry.type !== filter) return false;
         if (!needle) return true;
@@ -438,14 +571,20 @@ export class LedgerEngine {
         );
       })
       .sort(compareEntriesDesc);
-    return { month: query.month, entries, summary: summarize(entries, query.month) };
+    return {
+      ledgerId: ledger.id,
+      month: query.month,
+      entries,
+      summary: summarize(entries, query.month),
+    };
   }
 
-  async getStats(month: string): Promise<MonthStats> {
+  async getStats(ledgerId: string, month: string): Promise<MonthStats> {
     await this.ensureReady();
     assertMonth(month);
-    const entries = await this.loadMonthEntries(month);
-    const catalog = this.requireCatalog();
+    const ledger = this.requireLedger(ledgerId);
+    const entries = await this.loadMonthEntries(ledger.id, month);
+    const catalog = await this.getCatalog(ledger.id);
     const totalDays = daysInMonth(month);
     const daily: DailyTotal[] = [];
     const byDate = new Map<string, DailyTotal>();
@@ -479,6 +618,7 @@ export class LedgerEngine {
     const expenseEntries = entries.filter((entry) => entry.type === 'expense');
     const incomeEntries = entries.filter((entry) => entry.type === 'income');
     return {
+      ledgerId: ledger.id,
       month,
       expenseCents,
       incomeCents,
@@ -497,8 +637,9 @@ export class LedgerEngine {
   async saveEntry(input: SaveEntryInput): Promise<Entry> {
     await this.ensureReady();
     if (!isRecord(input)) throw new LedgerError('VALIDATION', '记账数据无效');
+    const ledger = this.requireLedger(input.ledgerId);
     const draft = validateEntryDraft(input.draft);
-    const catalog = this.requireCatalog();
+    const catalog = await this.getCatalog(ledger.id);
     const category = catalog.categories.find((item) => item.id === draft.categoryId);
     if (!category) throw new LedgerError('VALIDATION', '分类不存在');
     if (category.type !== draft.type) throw new LedgerError('VALIDATION', '分类与收支类型不匹配');
@@ -507,8 +648,9 @@ export class LedgerEngine {
 
     let existing: Entry | undefined;
     if (input.id !== undefined) {
+      if (typeof input.id !== 'string' || !input.id) throw new LedgerError('VALIDATION', '记账 ID 无效');
       const record = await this.database.get<EntryRecord>(ENTRY_STORE, input.id);
-      if (!record) throw new LedgerError('NOT_FOUND', '记账不存在');
+      if (!record || record.ledgerId !== ledger.id) throw new LedgerError('NOT_FOUND', '记账不存在');
       existing = await this.decodeEntry(record);
     }
     if (category.archived && existing?.categoryId !== category.id) {
@@ -530,23 +672,25 @@ export class LedgerEngine {
       createdAt: existing?.createdAt ?? timestamp,
       updatedAt: timestamp,
     };
-    const record = await this.encodeEntry(entry, this.enabled ? this.requireKeys() : null);
+    const record = await this.encodeEntry(ledger.id, entry, this.enabled ? this.requireKeys() : null);
     await this.database.run([ENTRY_STORE], 'readwrite', (tx) => tx.put(ENTRY_STORE, record));
     return entry;
   }
 
-  async deleteEntry(id: string): Promise<void> {
+  async deleteEntry(ledgerId: string, id: string): Promise<void> {
     await this.ensureReady();
+    const ledger = this.requireLedger(ledgerId);
     if (typeof id !== 'string' || !id) throw new LedgerError('VALIDATION', '记账 ID 无效');
     const record = await this.database.get<EntryRecord>(ENTRY_STORE, id);
-    if (!record) throw new LedgerError('NOT_FOUND', '记账不存在');
+    if (!record || record.ledgerId !== ledger.id) throw new LedgerError('NOT_FOUND', '记账不存在');
     await this.database.run([ENTRY_STORE], 'readwrite', (tx) => tx.delete(ENTRY_STORE, id));
   }
 
-  async addCategory(input: CategoryInput): Promise<Catalog> {
+  async addCategory(ledgerId: string, input: CategoryInput): Promise<Catalog> {
     await this.ensureReady();
+    const ledger = this.requireLedger(ledgerId);
     const validated = validateCategoryInput(input);
-    const catalog = this.requireCatalog();
+    const catalog = await this.getCatalog(ledger.id);
     const next = cloneCatalog(catalog);
     next.categories.push({
       id: `cat_${this.generateId()}`,
@@ -558,14 +702,15 @@ export class LedgerEngine {
       preset: false,
       sort: nextSort(catalog.categories),
     });
-    await this.saveCatalog(next);
+    await this.saveCatalog(ledger.id, next);
     return cloneCatalog(next);
   }
 
-  async updateCategory(id: string, patch: CategoryPatch): Promise<Catalog> {
+  async updateCategory(ledgerId: string, id: string, patch: CategoryPatch): Promise<Catalog> {
     await this.ensureReady();
+    const ledger = this.requireLedger(ledgerId);
     if (!isRecord(patch)) throw new LedgerError('VALIDATION', '参数无效');
-    const catalog = this.requireCatalog();
+    const catalog = await this.getCatalog(ledger.id);
     if (!catalog.categories.some((category) => category.id === id)) {
       throw new LedgerError('NOT_FOUND', '分类不存在');
     }
@@ -579,14 +724,15 @@ export class LedgerEngine {
       if (typeof patch.archived !== 'boolean') throw new LedgerError('VALIDATION', '归档状态无效');
       target.archived = patch.archived;
     }
-    await this.saveCatalog(next);
+    await this.saveCatalog(ledger.id, next);
     return cloneCatalog(next);
   }
 
-  async addAccount(input: AccountInput): Promise<Catalog> {
+  async addAccount(ledgerId: string, input: AccountInput): Promise<Catalog> {
     await this.ensureReady();
+    const ledger = this.requireLedger(ledgerId);
     const validated = validateAccountInput(input);
-    const catalog = this.requireCatalog();
+    const catalog = await this.getCatalog(ledger.id);
     const next = cloneCatalog(catalog);
     next.accounts.push({
       id: `acc_${this.generateId()}`,
@@ -597,14 +743,15 @@ export class LedgerEngine {
       preset: false,
       sort: nextSort(catalog.accounts),
     });
-    await this.saveCatalog(next);
+    await this.saveCatalog(ledger.id, next);
     return cloneCatalog(next);
   }
 
-  async updateAccount(id: string, patch: AccountPatch): Promise<Catalog> {
+  async updateAccount(ledgerId: string, id: string, patch: AccountPatch): Promise<Catalog> {
     await this.ensureReady();
+    const ledger = this.requireLedger(ledgerId);
     if (!isRecord(patch)) throw new LedgerError('VALIDATION', '参数无效');
-    const catalog = this.requireCatalog();
+    const catalog = await this.getCatalog(ledger.id);
     if (!catalog.accounts.some((account) => account.id === id)) {
       throw new LedgerError('NOT_FOUND', '账户不存在');
     }
@@ -618,41 +765,48 @@ export class LedgerEngine {
       if (typeof patch.archived !== 'boolean') throw new LedgerError('VALIDATION', '归档状态无效');
       target.archived = patch.archived;
     }
-    await this.saveCatalog(next);
+    await this.saveCatalog(ledger.id, next);
     return cloneCatalog(next);
   }
 
-  async exportBackup(): Promise<BackupPayload> {
+  async exportBackup(ledgerId: string): Promise<BackupPayload> {
     await this.ensureReady();
-    const entries = (await this.loadAllEntries()).sort(
-      (a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || Date.parse(a.createdAt) - Date.parse(b.createdAt),
-    );
+    const ledger = this.requireLedger(ledgerId);
+    const catalog = await this.getCatalog(ledger.id);
+    const entries = (await this.loadEntries(ledger.id))
+      .map(({ entry }) => entry)
+      .sort(
+        (a, b) => Date.parse(a.occurredAt) - Date.parse(b.occurredAt) || Date.parse(a.createdAt) - Date.parse(b.createdAt),
+      );
     return {
       app: 'ledgerlite',
-      schema: 1,
+      schema: 2,
       version: APP_VERSION,
       exportedAt: this.now().toISOString(),
+      ledgerName: ledger.name,
       entries,
-      catalog: cloneCatalog(this.requireCatalog()),
+      catalog: cloneCatalog(catalog),
     };
   }
 
-  async importBackup(backup: unknown): Promise<ImportResult> {
+  async importBackup(ledgerId: string, backup: unknown): Promise<ImportResult> {
     await this.ensureReady();
+    const ledger = this.requireLedger(ledgerId);
     const payload = parseBackup(backup);
     const keys = this.enabled ? this.requireKeys() : null;
     const [catalogRecord, entryRecords] = await Promise.all([
-      this.encodeCatalog(payload.catalog, keys),
-      Promise.all(payload.entries.map((entry) => this.encodeEntry(entry, keys))),
+      this.encodeCatalog(ledger.id, payload.catalog, keys),
+      Promise.all(payload.entries.map((entry) => this.encodeEntry(ledger.id, entry, keys))),
     ]);
     await this.database.run([ENTRY_STORE, KV_STORE], 'readwrite', async (tx) => {
-      await Promise.all([tx.clear(ENTRY_STORE), tx.delete(KV_STORE, 'catalog')]);
+      const keys = await tx.getAllKeysByIndex(ENTRY_STORE, LEDGER_INDEX, ledger.id);
+      await Promise.all(keys.map((key) => tx.delete(ENTRY_STORE, key)));
       await Promise.all([
         ...entryRecords.map((record) => tx.put(ENTRY_STORE, record)),
         tx.put(KV_STORE, catalogRecord),
       ]);
     });
-    this.catalog = payload.catalog;
+    this.catalogs.set(ledger.id, cloneCatalog(payload.catalog));
     return {
       entryCount: payload.entries.length,
       categoryCount: payload.catalog.categories.length,
@@ -663,15 +817,20 @@ export class LedgerEngine {
 
   async resetAll(): Promise<InitResult> {
     await this.ensureInitialized();
+    const ledger = createDefaultLedger(this.now(), 0);
     const catalog = createDefaultCatalog();
-    const catalogRecord = await this.encodeCatalog(catalog, null);
-    await this.database.run([ENTRY_STORE, KV_STORE], 'readwrite', async (tx) => {
-      await Promise.all([tx.clear(ENTRY_STORE), tx.clear(KV_STORE)]);
+    const catalogRecord = await this.encodeCatalog(ledger.id, catalog, null);
+    await this.database.run([ENTRY_STORE, KV_STORE, LEDGER_STORE], 'readwrite', async (tx) => {
+      await Promise.all([tx.clear(ENTRY_STORE), tx.clear(KV_STORE), tx.clear(LEDGER_STORE)]);
+      await tx.put(LEDGER_STORE, ledger);
       await tx.put(KV_STORE, catalogRecord);
     });
     this.enabled = false;
     this.keys = null;
-    this.catalog = catalog;
+    this.ledgers = [ledger];
+    this.catalogs.clear();
+    this.catalogs.set(ledger.id, catalog);
+    this.activeLedgerId = ledger.id;
     this.initialized = true;
     return this.currentInitResult();
   }
@@ -681,15 +840,28 @@ export class LedgerEngine {
     this.initialized = false;
     this.enabled = false;
     this.keys = null;
-    this.catalog = null;
+    this.resetCaches();
   }
 
   private currentInitResult(): InitResult {
-    const status: InitResult['status'] = this.enabled && !this.keys ? 'locked' : 'ready';
+    if (this.enabled && !this.keys) {
+      return {
+        status: 'locked',
+        crypto: { enabled: true, unlocked: false },
+        ledgers: [],
+        ledger: null,
+        catalog: null,
+        version: APP_VERSION,
+      };
+    }
+    const ledger = this.activeLedger();
+    const catalog = ledger ? (this.catalogs.get(ledger.id) ?? null) : null;
     return {
-      status,
-      crypto: { enabled: this.enabled, unlocked: this.enabled && this.keys !== null },
-      catalog: status === 'ready' ? cloneCatalog(this.requireCatalog()) : null,
+      status: 'ready',
+      crypto: { enabled: this.enabled, unlocked: this.keys !== null },
+      ledgers: this.ledgers.map(cloneLedger),
+      ledger: ledger ? cloneLedger(ledger) : null,
+      catalog: catalog ? cloneCatalog(catalog) : null,
       version: APP_VERSION,
     };
   }
@@ -708,9 +880,45 @@ export class LedgerEngine {
     return this.keys;
   }
 
-  private requireCatalog(): Catalog {
-    if (!this.catalog) throw new LedgerError('INTERNAL', '目录尚未加载');
-    return this.catalog;
+  private requireLedger(ledgerId: unknown): Ledger {
+    const id = requireLedgerId(ledgerId);
+    const ledger = this.ledgers.find((item) => item.id === id);
+    if (!ledger) throw new LedgerError('NOT_FOUND', '账本不存在');
+    return ledger;
+  }
+
+  private activeLedger(): Ledger | null {
+    if (this.activeLedgerId) {
+      const active = this.ledgers.find((ledger) => ledger.id === this.activeLedgerId);
+      if (active) return active;
+    }
+    return this.ledgers[0] ?? null;
+  }
+
+  private resetCaches(): void {
+    this.ledgers = [];
+    this.catalogs.clear();
+    this.activeLedgerId = null;
+  }
+
+  private async loadReadyState(): Promise<void> {
+    await this.ensureLedgerList();
+    const first = this.ledgers[0] ?? null;
+    this.activeLedgerId = first?.id ?? null;
+    if (first) await this.getCatalog(first.id);
+  }
+
+  private async ensureLedgerList(): Promise<Ledger[]> {
+    if (this.ledgers.length > 0) return this.ledgers;
+    const stored = sortLedgers(await this.database.getAll<Ledger>(LEDGER_STORE));
+    if (stored.length > 0) {
+      this.ledgers = stored;
+      return stored;
+    }
+    const created = createDefaultLedger(this.now(), 0);
+    await this.database.run([LEDGER_STORE], 'readwrite', (tx) => tx.put(LEDGER_STORE, created));
+    this.ledgers = [created];
+    return this.ledgers;
   }
 
   private async readCryptoMeta(): Promise<CryptoMetaRecord | undefined> {
@@ -719,24 +927,25 @@ export class LedgerEngine {
     return record;
   }
 
-  private async loadCatalog(): Promise<Catalog> {
-    const record = await this.database.get<CatalogRecord>(KV_STORE, 'catalog');
-    if (record && record.key === 'catalog') {
+  private async getCatalog(ledgerId: string): Promise<Catalog> {
+    const cached = this.catalogs.get(ledgerId);
+    if (cached) return cached;
+    const key = catalogKey(ledgerId);
+    const record = await this.database.get<CatalogRecord>(KV_STORE, key);
+    if (record && record.key === key) {
       const catalog = await this.decodeValue(record.payload, CATALOG_AAD);
-      this.catalog = catalog;
+      this.catalogs.set(ledgerId, catalog);
       return catalog;
     }
     const catalog = createDefaultCatalog();
-    const stored = await this.encodeCatalog(catalog, this.enabled ? this.requireKeys() : null);
-    await this.database.run([KV_STORE], 'readwrite', (tx) => tx.put(KV_STORE, stored));
-    this.catalog = catalog;
+    await this.saveCatalog(ledgerId, catalog);
     return catalog;
   }
 
-  private async saveCatalog(catalog: Catalog): Promise<void> {
-    const record = await this.encodeCatalog(catalog, this.enabled ? this.requireKeys() : null);
+  private async saveCatalog(ledgerId: string, catalog: Catalog): Promise<void> {
+    const record = await this.encodeCatalog(ledgerId, catalog, this.enabled ? this.requireKeys() : null);
     await this.database.run([KV_STORE], 'readwrite', (tx) => tx.put(KV_STORE, record));
-    this.catalog = catalog;
+    this.catalogs.set(ledgerId, catalog);
   }
 
   private async encodeValue<T>(value: T, aad: string, keys: CryptoKeys | null): Promise<StoredValue<T>> {
@@ -749,11 +958,12 @@ export class LedgerEngine {
     return decryptJson<T>(this.requireKeys(), payload, aad);
   }
 
-  private async encodeEntry(entry: Entry, keys: CryptoKeys | null): Promise<EntryRecord> {
+  private async encodeEntry(ledgerId: string, entry: Entry, keys: CryptoKeys | null): Promise<EntryRecord> {
     const month = monthKeyOfIso(entry.occurredAt);
     const monthTag = keys ? await hmacHex(keys, month) : month;
     return {
       id: entry.id,
+      ledgerId,
       monthTag,
       payload: await this.encodeValue(entry, entryAad(entry.id, monthTag), keys),
     };
@@ -763,18 +973,26 @@ export class LedgerEngine {
     return this.decodeValue(record.payload, entryAad(record.id, record.monthTag));
   }
 
-  private async encodeCatalog(catalog: Catalog, keys: CryptoKeys | null): Promise<CatalogRecord> {
-    return { key: 'catalog', payload: await this.encodeValue(catalog, CATALOG_AAD, keys) };
+  private async encodeCatalog(ledgerId: string, catalog: Catalog, keys: CryptoKeys | null): Promise<CatalogRecord> {
+    return { key: catalogKey(ledgerId), payload: await this.encodeValue(catalog, CATALOG_AAD, keys) };
   }
 
-  private async loadAllEntries(): Promise<Entry[]> {
-    const records = await this.database.getAll<EntryRecord>(ENTRY_STORE);
-    return Promise.all(records.map((record) => this.decodeEntry(record)));
+  private async loadEntries(ledgerId?: string): Promise<DecodedEntry[]> {
+    const records = ledgerId
+      ? await this.database.getAllByIndex<EntryRecord>(ENTRY_STORE, LEDGER_INDEX, ledgerId)
+      : await this.database.getAll<EntryRecord>(ENTRY_STORE);
+    return Promise.all(
+      records.map(async (record) => ({ ledgerId: record.ledgerId, entry: await this.decodeEntry(record) })),
+    );
   }
 
-  private async loadMonthEntries(month: string): Promise<Entry[]> {
+  private async loadMonthEntries(ledgerId: string, month: string): Promise<Entry[]> {
     const monthTag = this.enabled ? await hmacHex(this.requireKeys(), month) : month;
-    const records = await this.database.getAllByIndex<EntryRecord>(ENTRY_STORE, MONTH_INDEX, monthTag);
+    const records = await this.database.getAllByIndex<EntryRecord>(
+      ENTRY_STORE,
+      LEDGER_MONTH_INDEX,
+      IDBKeyRange.only([ledgerId, monthTag]),
+    );
     return Promise.all(records.map((record) => this.decodeEntry(record)));
   }
 }

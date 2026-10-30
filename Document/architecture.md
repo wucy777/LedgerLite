@@ -49,12 +49,13 @@ frontend → shared ← backend
 ```text
 页面加载
   → App 调用 initialize
-  → Worker 打开 IndexedDB，读取 catalog / crypto 元数据
-  → 未加密：返回 ready + catalog
+  → Worker 打开 IndexedDB，读取账本索引、当前目录 / crypto 元数据
+  → 未加密：返回 ready + ledgers + 首个账本目录
   → 已加密：返回 locked，UI 显示解锁界面
   → 用户输入口令：unlock 派生密钥并验证 verifier
-  → 返回 ready + 解密后的 catalog
-  → 页面按月份调用 listMonth / getStats
+  → 返回 ready + ledgers + 解密后的目录
+  → 页面按 ledgerId + 月份调用 listMonth / getStats
+  → 切换账本时调用 openLedger，只加载目标账本目录
 ```
 
 请求格式：
@@ -79,26 +80,29 @@ frontend → shared ← backend
 
 ### 4.1 领域模型
 
-- `Entry`：账目。金额 `amountCents` 为整数分；日期使用 ISO 时间；本地时区用于展示与月度归类。
-- `Category`：分类。包含所属收支类型、图标名、颜色、排序与 `archived` 标记。
-- `Account`：账户。同样支持软归档。
-- `Catalog`：分类与账户的集合。
+- `Ledger`：账本元数据（名称、颜色、排序），用于切换与管理。
+- `Entry`：当前账本内的账目。金额 `amountCents` 为整数分；日期使用 ISO 时间；本地时区用于展示与月度归类。
+- `Category`：账本内的分类。包含所属收支类型、图标名、颜色、排序与 `archived` 标记。
+- `Account`：账本内的账户。同样支持软归档。
+- `Catalog`：单个账本的分类与账户集合；不同账本完全独立。
 - `MonthStats`：由数据层聚合的月度视图，UI 不再重复计算。
 
 ### 4.2 IndexedDB
 
-数据库：`ledgerlite`，版本 `1`。
+数据库：`ledgerlite`，版本 `2`。
 
 | Store | keyPath | 索引 | 内容 |
 | --- | --- | --- | --- |
-| `entries` | `id` | `monthTag` | 账目记录，字段可能整体加密 |
-| `kv` | `key` | — | `catalog`、`crypto` 元数据 |
+| `ledgers` | `id` | `sort` | 账本元数据，明文保存 |
+| `entries` | `id` | `ledgerId`、`ledgerMonth`（`['ledgerId','monthTag']`） | 账目记录；`ledgerId` 为顶层隔离字段，载荷可能整体加密 |
+| `kv` | `key` | — | `catalog:<ledgerId>`、`crypto` 元数据 |
 
 记录包装形式：
 
 ```ts
 interface EntryRecord {
   id: string;
+  ledgerId: string;         // 账本隔离字段，不参与目录加密
   monthTag: string;         // 明文模式下为 YYYY-MM；加密模式下为 HMAC 十六进制
   payload:
     | { encrypted: false; value: Entry }
@@ -106,13 +110,24 @@ interface EntryRecord {
 }
 ```
 
-目录记录使用相同的 `payload` 包装。软归档避免历史账目因删除分类而丢失展示信息。
+目录记录使用相同的 `payload` 包装，按 `catalog:<ledgerId>` 分开保存。软归档避免历史账目因删除分类而丢失展示信息。
 
-### 4.3 重要约束
+### 4.3 多账本
 
-- 一次跨 store 重写（启用/关闭加密、导入）必须在单个 IndexedDB 事务中提交。
+- 每个账本拥有独立的分类、账户、账目和月度统计；切换账本不会改变其他账本的数据。
+- 账本元数据（名称、颜色、ID）为了显示账本切换器而保持明文；账本内的业务载荷仍按加密设置处理。
+- 旧版 v1 数据库升级到 v2 时：
+  1. 为既有 entries 补上 `ledgerId = ledger_default`，不改动加密 payload；
+  2. 将 `kv['catalog']` 原样迁移为 `kv['catalog:ledger_default']`；
+  3. 创建“默认账本”记录。
+- 删除账本会在单个事务中删除它的账目、目录和账本记录；最后一个账本不可删除。
+- 导入备份只替换当前账本，其他账本保持不变。
+
+### 4.4 重要约束
+
+- 一次跨 store 重写（启用/关闭加密、导入、删除账本）必须在单个 IndexedDB 事务中提交。
 - IDB 事务内不得 await 非 IDB 异步任务，否则事务会自动提交；所有加解密先在事务外完成。
-- 写入后由前端递增 `revision`，触发当前月的账本与统计重新查询。
+- 写入后由前端递增 `revision`，触发当前账本的账本与统计重新查询。
 - 月份标签按设备本地时区计算，保证跨零点记账落到正确的自然日。
 
 ## 5. 加密流程
@@ -133,8 +148,9 @@ master bits (256)
 - 加密元数据（盐、验证器）以明文保存，但不包含口令或密钥。
 - 口令、派生密钥与解密后的业务数据只存在于 Worker 内存中。
 - 锁定操作清除内存中的密钥；下一次查询必须重新解锁。
+- 加密覆盖所有账本的 entries 和全部账本目录；账本名称等导航元数据保持明文。
 
-启用加密时，数据层读取全部明文记录，完成加密后再打开一个 `entries + kv` 的读写事务完成替换。关闭加密采用相反流程。
+启用加密时，数据层读取全部账本的明文记录与目录，完成加密后再打开一个 `entries + kv` 的读写事务完成替换。关闭加密采用相反流程。
 
 ## 6. 性能设计
 
@@ -152,7 +168,7 @@ master bits (256)
 
 ## 7. 导出路径
 
-导出本身不经过数据服务：数据层返回完整的明文 `BackupPayload`，由设置页生成文件。
+导出按当前账本生成：数据层返回该账本的明文 `BackupPayload`（含账本名称），由设置页生成文件。
 
 - Web：使用 Blob URL 触发浏览器下载。
 - Android：使用 Capacitor Filesystem 将文件写入应用缓存目录，再通过 Capacitor Share 打开系统分享面板。WebView 不提供浏览器式下载目录，因此没有沿用 `<a download>` 路径。
@@ -161,8 +177,8 @@ master bits (256)
 ## 8. 扩展路径
 
 - **替换存储**：实现相同的 `StorageApi` 方法，将 `storage.worker.ts` 替换成原生 Capacitor 插件或 SQLite Worker，前端无需改动。
-- **多账本**：在 `Entry` 与查询契约增加 `ledgerId`，在 `kv` 增加账本目录；当前单账本设计是有意保持录入路径最短。
 - **同步**：应以独立同步服务为边界，不应把网络请求塞入 UI 组件。记录已包含 `updatedAt`，可作为同步冲突检测的基础。
+- **全量备份**：当前导出粒度为单个账本；若需要一次导出全部账本，可在 `BackupPayload` 外层增加账本数组并保持 v2 单账本导入兼容。
 - **国际化**：UI 文案集中化后可增加语言包；数据层错误码已经是语言无关的枚举。
 
 ## 9. 进一步阅读

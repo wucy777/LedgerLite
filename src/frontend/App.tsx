@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import type { Catalog, Entry, InitResult } from '@shared/types';
+import type { Catalog, Entry, InitResult, Ledger } from '@shared/types';
 import { currentMonthKey, monthKeyOfIso } from '@shared/date';
 import { getLedgerClient } from './api/client';
 import { BootScreen } from './components/BootScreen';
@@ -8,6 +8,7 @@ import { Icon } from './components/Icon';
 import { LockScreen } from './components/LockScreen';
 import { PageSkeleton } from './components/PageSkeleton';
 import { ToastProvider, useToast } from './components/ToastProvider';
+import { LedgerSheet, LedgerTrigger } from './features/ledger/LedgerSwitcher';
 import { LedgerPage } from './pages/LedgerPage';
 
 type TabId = 'ledger' | 'stats' | 'settings';
@@ -32,6 +33,24 @@ const NAV_ITEMS: ReadonlyArray<{ id: TabId; label: string; icon: 'ledger' | 'cha
   { id: 'settings', label: '设置', icon: 'settings' },
 ];
 
+const ACTIVE_LEDGER_KEY = 'ledgerlite.ui.activeLedgerId';
+
+function readActiveLedgerId(): string | null {
+  try {
+    return window.localStorage.getItem(ACTIVE_LEDGER_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function rememberActiveLedger(id: string): void {
+  try {
+    window.localStorage.setItem(ACTIVE_LEDGER_KEY, id);
+  } catch {
+    // Remembering the last ledger is optional.
+  }
+}
+
 function App() {
   return (
     <ToastProvider>
@@ -46,25 +65,55 @@ function AppController() {
   const [booted, setBooted] = useState(false);
   const [bootError, setBootError] = useState<string | null>(null);
   const [session, setSession] = useState<InitResult | null>(null);
+  const [ledgers, setLedgers] = useState<Ledger[]>([]);
+  const [activeLedger, setActiveLedger] = useState<Ledger | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [ledgerSheetOpen, setLedgerSheetOpen] = useState(false);
   const [tab, setTab] = useState<TabId>('ledger');
   const [month, setMonth] = useState(() => currentMonthKey());
   const [revision, setRevision] = useState(0);
   const [sheet, setSheet] = useState<SheetState | null>(null);
+
+  const applyLedgerSession = useCallback(
+    async (result: InitResult, preferredLedgerId: string | null = readActiveLedgerId()) => {
+      setSession(result);
+      setLedgers(result.ledgers);
+      if (result.status !== 'ready' || !result.ledger || !result.catalog) {
+        setActiveLedger(null);
+        setCatalog(null);
+        return;
+      }
+
+      const preferred = preferredLedgerId
+        ? result.ledgers.find((ledger) => ledger.id === preferredLedgerId)
+        : undefined;
+      if (preferred && preferred.id !== result.ledger.id) {
+        const data = await client.call('openLedger', { ledgerId: preferred.id });
+        setActiveLedger(data.ledger);
+        setCatalog(data.catalog);
+        rememberActiveLedger(data.ledger.id);
+        return;
+      }
+
+      setActiveLedger(result.ledger);
+      setCatalog(result.catalog);
+      rememberActiveLedger(result.ledger.id);
+    },
+    [client],
+  );
 
   const initialize = useCallback(async () => {
     setBooted(false);
     setBootError(null);
     try {
       const result = await client.call('initialize', undefined);
-      setSession(result);
-      setCatalog(result.catalog);
+      await applyLedgerSession(result);
     } catch (reason) {
       setBootError(reason instanceof Error ? reason.message : '无法打开本地账本');
     } finally {
       setBooted(true);
     }
-  }, [client]);
+  }, [applyLedgerSession, client]);
 
   useEffect(() => {
     void initialize();
@@ -85,7 +134,7 @@ function AppController() {
   }, [tab]);
 
   useEffect(() => {
-    if (!session || session.status !== 'ready' || sheet) return;
+    if (!session || session.status !== 'ready' || sheet || ledgerSheetOpen) return;
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
       const target = event.target;
@@ -102,29 +151,31 @@ function AppController() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [session, sheet]);
+  }, [session, sheet, ledgerSheetOpen]);
 
   const handleUnlock = useCallback(
     async (passphrase: string) => {
       const result = await client.call('unlock', { passphrase });
-      if (result.status !== 'ready' || !result.catalog) {
+      if (result.status !== 'ready') {
         throw new Error('解锁后未取得账本数据');
       }
-      setSession(result);
-      setCatalog(result.catalog);
+      await applyLedgerSession(result);
       setBooted(true);
     },
-    [client],
+    [applyLedgerSession, client],
   );
 
-  const handleSessionChange = useCallback((next: InitResult) => {
-    setSession(next);
-    setCatalog(next.catalog);
-    if (next.status === 'locked') {
-      setSheet(null);
-      setTab('ledger');
-    }
-  }, []);
+  const handleSessionChange = useCallback(
+    (next: InitResult) => {
+      void applyLedgerSession(next, activeLedger?.id ?? readActiveLedgerId());
+      if (next.status === 'locked') {
+        setSheet(null);
+        setLedgerSheetOpen(false);
+        setTab('ledger');
+      }
+    },
+    [activeLedger?.id, applyLedgerSession],
+  );
 
   const handleSaved = useCallback(
     (entry: Entry) => {
@@ -158,6 +209,72 @@ function AppController() {
     setRevision((value) => value + 1);
   }, []);
 
+  const handleSelectLedger = useCallback(
+    async (ledger: Ledger) => {
+      if (ledger.id === activeLedger?.id) return;
+      const data = await client.call('openLedger', { ledgerId: ledger.id });
+      setActiveLedger(data.ledger);
+      setCatalog(data.catalog);
+      rememberActiveLedger(data.ledger.id);
+      setMonth(currentMonthKey());
+      setRevision((value) => value + 1);
+      setSheet(null);
+      setTab('ledger');
+      showToast(`已切换到「${data.ledger.name}」`, 'success');
+    },
+    [activeLedger?.id, client, showToast],
+  );
+
+  const handleCreateLedger = useCallback(
+    async (name: string) => {
+      const result = await client.call('createLedger', { name });
+      setSession(result);
+      setLedgers(result.ledgers);
+      setActiveLedger(result.ledger);
+      setCatalog(result.catalog);
+      rememberActiveLedger(result.ledger.id);
+      setMonth(currentMonthKey());
+      setRevision((value) => value + 1);
+      setSheet(null);
+      setTab('ledger');
+      showToast(`已创建「${result.ledger.name}」`, 'success');
+    },
+    [client, showToast],
+  );
+
+  const handleRenameLedger = useCallback(
+    async (ledger: Ledger, name: string) => {
+      const updated = await client.call('updateLedger', { id: ledger.id, name });
+      setLedgers((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      if (activeLedger?.id === updated.id) setActiveLedger(updated);
+      showToast('账本名称已更新', 'success');
+    },
+    [activeLedger?.id, client, showToast],
+  );
+
+  const handleDeleteLedger = useCallback(
+    async (ledger: Ledger) => {
+      const result = await client.call('deleteLedger', { id: ledger.id });
+      setLedgers(result.ledgers);
+      if (activeLedger?.id === ledger.id) {
+        const next = result.ledgers[0];
+        if (next) {
+          const data = await client.call('openLedger', { ledgerId: next.id });
+          setActiveLedger(data.ledger);
+          setCatalog(data.catalog);
+          rememberActiveLedger(data.ledger.id);
+        } else {
+          setActiveLedger(null);
+          setCatalog(null);
+        }
+        setRevision((value) => value + 1);
+        setTab('ledger');
+      }
+      showToast(`已删除「${ledger.name}」`, 'success');
+    },
+    [activeLedger?.id, client, showToast],
+  );
+
   const openAdd = useCallback(() => setSheet({ entry: null }), []);
   const openEdit = useCallback((entry: Entry) => setSheet({ entry }), []);
 
@@ -166,12 +283,16 @@ function AppController() {
   if (!session || session.status === 'locked') {
     return <LockScreen onUnlock={handleUnlock} />;
   }
-  if (!catalog) return <BootScreen error="账本目录未能载入" onRetry={() => void initialize()} />;
+  if (!activeLedger || !catalog) {
+    return <BootScreen error="账本未能载入" onRetry={() => window.location.reload()} />;
+  }
 
   const renderPage = () => {
     if (tab === 'ledger') {
       return (
         <LedgerPage
+          key={`ledger-${activeLedger.id}`}
+          ledgerId={activeLedger.id}
           month={month}
           revision={revision}
           catalog={catalog}
@@ -182,10 +303,20 @@ function AppController() {
       );
     }
     if (tab === 'stats') {
-      return <StatsPage month={month} revision={revision} onMonthChange={setMonth} />;
+      return (
+        <StatsPage
+          key={`stats-${activeLedger.id}`}
+          ledgerId={activeLedger.id}
+          month={month}
+          revision={revision}
+          onMonthChange={setMonth}
+        />
+      );
     }
     return (
       <SettingsPage
+        key={`settings-${activeLedger.id}`}
+        ledgerId={activeLedger.id}
         version={session.version}
         crypto={session.crypto}
         catalog={catalog}
@@ -206,6 +337,13 @@ function AppController() {
             <div className="rail__name">简账</div>
             <div className="rail__tagline">Local ledger</div>
           </div>
+        </div>
+        <div className="rail__ledger">
+          <LedgerTrigger
+            ledger={activeLedger}
+            ledgerCount={ledgers.length}
+            onOpen={() => setLedgerSheetOpen(true)}
+          />
         </div>
         <nav className="rail__nav">
           {NAV_ITEMS.map((item) => (
@@ -241,10 +379,20 @@ function AppController() {
               <span className="app-brand__tagline">Local ledger</span>
             </div>
           </div>
-          <span className="local-badge">
-            <Icon name={session.crypto.enabled ? 'lock' : 'shield'} size={13} />
-            {session.crypto.enabled ? '本地加密' : '仅本机'}
-          </span>
+          <div className="app-header__actions">
+            <LedgerTrigger
+              ledger={activeLedger}
+              ledgerCount={ledgers.length}
+              onOpen={() => setLedgerSheetOpen(true)}
+            />
+            <span
+              className="local-badge local-badge--compact"
+              title={session.crypto.enabled ? '本地加密' : '仅本机'}
+            >
+              <Icon name={session.crypto.enabled ? 'lock' : 'shield'} size={13} />
+              <span className="local-badge__text">{session.crypto.enabled ? '本地加密' : '仅本机'}</span>
+            </span>
+          </div>
         </header>
 
         <main className="app-content">
@@ -289,10 +437,23 @@ function AppController() {
         </div>
       </div>
 
+      {ledgerSheetOpen ? (
+        <LedgerSheet
+          ledgers={ledgers}
+          activeLedgerId={activeLedger.id}
+          onClose={() => setLedgerSheetOpen(false)}
+          onSelect={handleSelectLedger}
+          onCreate={handleCreateLedger}
+          onRename={handleRenameLedger}
+          onDelete={handleDeleteLedger}
+        />
+      ) : null}
+
       {sheet ? (
         <Suspense fallback={null}>
           <EntrySheet
             key={sheet.entry?.id ?? 'new'}
+            ledgerId={activeLedger.id}
             entry={sheet.entry}
             catalog={catalog}
             onClose={() => setSheet(null)}

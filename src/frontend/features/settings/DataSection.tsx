@@ -25,6 +25,7 @@ import { Dialog } from './Dialog';
 import { friendlyError } from './errors';
 
 interface DataSectionProps {
+  ledgerId: string;
   encrypted: boolean;
   onCatalogChange: (catalog: Catalog) => void;
   onSessionChange: (session: InitResult) => void;
@@ -63,7 +64,7 @@ function DataRow({ icon, title, description, busy, disabled, onClick, trail }: D
   );
 }
 
-export function DataSection({ encrypted, onCatalogChange, onSessionChange, onDataChanged }: DataSectionProps) {
+export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionChange, onDataChanged }: DataSectionProps) {
   const client = useMemo(() => getLedgerClient(), []);
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -111,7 +112,7 @@ export function DataSection({ encrypted, onCatalogChange, onSessionChange, onDat
     if (exporting) return;
     setExporting('json');
     try {
-      const payload = await client.call('exportBackup', undefined);
+      const payload = await client.call('exportBackup', { ledgerId });
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
       const outcome = await saveExportFile(blob, backupFileName());
       showToast(outcome === 'shared' ? '备份已生成，请选择保存位置' : 'JSON 备份已导出', 'success');
@@ -126,7 +127,7 @@ export function DataSection({ encrypted, onCatalogChange, onSessionChange, onDat
     if (exporting) return;
     setExporting('csv');
     try {
-      const payload = await client.call('exportBackup', undefined);
+      const payload = await client.call('exportBackup', { ledgerId });
       const blob = new Blob([buildCsv(payload)], { type: 'text/csv;charset=utf-8' });
       const outcome = await saveExportFile(blob, csvFileName());
       showToast(outcome === 'shared' ? '表格已生成，请选择保存位置' : 'CSV 表格已导出', 'success');
@@ -161,7 +162,7 @@ export function DataSection({ encrypted, onCatalogChange, onSessionChange, onDat
     setImporting(true);
     setImportError('');
     try {
-      const result = await client.call('importBackup', { backup: importPreview.backup });
+      const result = await client.call('importBackup', { ledgerId, backup: importPreview.backup });
       onCatalogChange(result.catalog);
       onDataChanged();
       setStorageTick((value) => value + 1);
@@ -218,7 +219,7 @@ export function DataSection({ encrypted, onCatalogChange, onSessionChange, onDat
           <DataRow
             icon="download"
             title="导出 JSON 备份"
-            description="完整记录、分类与账户"
+            description="当前账本的完整记录、分类与账户"
             busy={exporting === 'json'}
             disabled={exporting !== null}
             onClick={() => void handleExportJson()}
@@ -226,7 +227,7 @@ export function DataSection({ encrypted, onCatalogChange, onSessionChange, onDat
           <DataRow
             icon="download"
             title="导出 CSV 表格"
-            description="当前全部记录，可用表格软件打开"
+            description="当前账本记录，可用表格软件打开"
             busy={exporting === 'csv'}
             disabled={exporting !== null}
             onClick={() => void handleExportCsv()}
@@ -234,7 +235,7 @@ export function DataSection({ encrypted, onCatalogChange, onSessionChange, onDat
           <DataRow
             icon="upload"
             title="导入 JSON 备份"
-            description="从备份文件恢复，覆盖当前数据"
+            description="从备份文件恢复，覆盖当前账本"
             disabled={importing || exporting !== null}
             onClick={() => fileInputRef.current?.click()}
           />
@@ -345,7 +346,7 @@ export function DataSection({ encrypted, onCatalogChange, onSessionChange, onDat
           ) : null}
           <div className="settings-warning">
             <Icon name="alert" size={16} />
-            <p>导入会替换当前全部记录、分类与账户，且无法撤销。建议先导出当前账本备份。</p>
+            <p>导入会替换当前账本的全部记录、分类与账户，且无法撤销。其他账本不受影响；建议先导出当前账本备份。</p>
           </div>
           {importError ? (
             <p className="settings-field__error" role="alert">

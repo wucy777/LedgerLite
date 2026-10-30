@@ -109,7 +109,7 @@ function describeError(reason: unknown, fallback: string): string {
   return reason instanceof Error && reason.message ? reason.message : fallback;
 }
 
-export function EntrySheet({ entry, catalog, onClose, onSaved, onDeleted }: EntrySheetProps) {
+export function EntrySheet({ ledgerId, entry, catalog, onClose, onSaved, onDeleted }: EntrySheetProps) {
   const { showToast } = useToast();
   const client = useMemo(() => getLedgerClient(), []);
   const titleId = useId();
@@ -349,7 +349,7 @@ export function EntrySheet({ entry, catalog, onClose, onSaved, onDeleted }: Entr
     busyRef.current = true;
     setBusy('save');
     try {
-      const saved = await client.call('saveEntry', { id: entry?.id, draft });
+      const saved = await client.call('saveEntry', { ledgerId, id: entry?.id, draft });
       writeStored(`category.${type}`, categoryId);
       writeStored('account', accountId);
       dismiss(() => onSaved(saved));
@@ -367,7 +367,7 @@ export function EntrySheet({ entry, catalog, onClose, onSaved, onDeleted }: Entr
     setBusy('delete');
     setError(null);
     try {
-      await client.call('deleteEntry', { id: entry.id });
+      await client.call('deleteEntry', { ledgerId, id: entry.id });
       dismiss(() => onDeleted(entry));
     } catch (reason) {
       const message = describeError(reason, '删除失败，请稍后重试');

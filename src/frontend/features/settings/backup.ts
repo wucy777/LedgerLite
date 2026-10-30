@@ -129,7 +129,7 @@ export async function readBackupFile(file: File): Promise<BackupPreview> {
   }
   if (!isRecord(parsed)) throw new Error('备份数据格式无效');
   if (parsed.app !== 'ledgerlite') throw new Error('不是简账备份文件');
-  if (parsed.schema !== 1) throw new Error('不支持的备份版本');
+  if (parsed.schema !== 1 && parsed.schema !== 2) throw new Error('不支持的备份版本');
   if (!Array.isArray(parsed.entries)) throw new Error('备份记录格式无效');
   if (!isRecord(parsed.catalog)) throw new Error('备份中的分类与账户格式无效');
   if (!Array.isArray(parsed.catalog.categories) || !Array.isArray(parsed.catalog.accounts)) {

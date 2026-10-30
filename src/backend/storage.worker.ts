@@ -21,26 +21,34 @@ async function dispatch(request: RpcRequest): Promise<unknown> {
       return engine.enableEncryption(request.params.passphrase);
     case 'disableEncryption':
       return engine.disableEncryption(request.params.passphrase);
+    case 'openLedger':
+      return engine.openLedger(request.params.ledgerId);
+    case 'createLedger':
+      return engine.createLedger(request.params.name);
+    case 'updateLedger':
+      return engine.updateLedger(request.params.id, request.params.name);
+    case 'deleteLedger':
+      return engine.deleteLedger(request.params.id);
     case 'listMonth':
       return engine.listMonth(request.params);
     case 'getStats':
-      return engine.getStats(request.params.month);
+      return engine.getStats(request.params.ledgerId, request.params.month);
     case 'saveEntry':
       return engine.saveEntry(request.params);
     case 'deleteEntry':
-      return engine.deleteEntry(request.params.id);
+      return engine.deleteEntry(request.params.ledgerId, request.params.id);
     case 'addCategory':
-      return engine.addCategory(request.params);
+      return engine.addCategory(request.params.ledgerId, request.params.category);
     case 'updateCategory':
-      return engine.updateCategory(request.params.id, request.params.patch);
+      return engine.updateCategory(request.params.ledgerId, request.params.id, request.params.patch);
     case 'addAccount':
-      return engine.addAccount(request.params);
+      return engine.addAccount(request.params.ledgerId, request.params.account);
     case 'updateAccount':
-      return engine.updateAccount(request.params.id, request.params.patch);
+      return engine.updateAccount(request.params.ledgerId, request.params.id, request.params.patch);
     case 'exportBackup':
-      return engine.exportBackup();
+      return engine.exportBackup(request.params.ledgerId);
     case 'importBackup':
-      return engine.importBackup(request.params.backup);
+      return engine.importBackup(request.params.ledgerId, request.params.backup);
     case 'resetAll':
       return engine.resetAll();
     default:

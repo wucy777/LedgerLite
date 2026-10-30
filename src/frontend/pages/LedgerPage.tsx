@@ -44,7 +44,7 @@ function rememberViewMode(mode: LedgerViewMode): void {
   }
 }
 
-export function LedgerPage({ month, revision, catalog, onMonthChange, onAdd, onEdit }: LedgerPageProps) {
+export function LedgerPage({ ledgerId, month, revision, catalog, onMonthChange, onAdd, onEdit }: LedgerPageProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<EntryFilter>('all');
   const [viewMode, setViewMode] = useState<LedgerViewMode>(readViewMode);
@@ -52,8 +52,8 @@ export function LedgerPage({ month, revision, catalog, onMonthChange, onAdd, onE
   const previousMonth = useRef(month);
 
   const resource = useAsyncResource(
-    () => getLedgerClient().call('listMonth', { month }),
-    [month, revision],
+    () => getLedgerClient().call('listMonth', { ledgerId, month }),
+    [ledgerId, month, revision],
   );
 
   useEffect(() => {
@@ -64,10 +64,18 @@ export function LedgerPage({ month, revision, catalog, onMonthChange, onAdd, onE
   }, [month]);
 
   useEffect(() => {
+    setQuery('');
+    setFilter('all');
+  }, [ledgerId]);
+
+  useEffect(() => {
     rememberViewMode(viewMode);
   }, [viewMode]);
 
-  const data = resource.data && resource.data.month === month ? resource.data : null;
+  const data =
+    resource.data && resource.data.month === month && resource.data.ledgerId === ledgerId
+      ? resource.data
+      : null;
   const showInitialLoading = data === null && resource.status !== 'error';
   const showError = data === null && resource.status === 'error';
 
