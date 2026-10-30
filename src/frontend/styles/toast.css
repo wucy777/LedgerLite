@@ -1,0 +1,57 @@
+body.is-sheet-open .toast-region {
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease;
+}
+
+.toast-region {
+  position: fixed;
+  z-index: 80;
+  top: calc(var(--safe-top) + 56px);
+  left: 50%;
+  display: flex;
+  width: min(calc(100% - 32px), 420px);
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.toast {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  color: var(--hero-ink);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--hero-start) 94%, transparent);
+  box-shadow: var(--shadow-md);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: center;
+  animation: toast-in 260ms var(--ease-spring) both;
+  backdrop-filter: blur(16px);
+}
+
+.toast--success svg {
+  color: #a8d7b6;
+}
+
+.toast--error svg {
+  color: #f0a18f;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, -8px, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "name": "简账 · 本地记账",
+  "short_name": "简账",
+  "description": "离线优先、可加密的本地记账应用。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f3efe6",
+  "theme_color": "#2c4d39",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

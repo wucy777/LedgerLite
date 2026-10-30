@@ -1,0 +1,102 @@
+.category-glyph {
+  --glyph-color: #8a8e85;
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  color: var(--glyph-color);
+  border: 1px solid color-mix(in srgb, var(--glyph-color) 16%, transparent);
+  border-radius: 14px;
+  background:
+    linear-gradient(145deg, color-mix(in srgb, var(--glyph-color) 15%, transparent), transparent 160%),
+    color-mix(in srgb, var(--glyph-color) 8%, var(--surface));
+}
+
+.category-glyph--sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 11px;
+}
+
+.category-glyph--md {
+  width: 42px;
+  height: 42px;
+}
+
+.category-glyph--lg {
+  width: 52px;
+  height: 52px;
+  border-radius: 17px;
+}
+
+.month-switcher {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--ink-soft);
+}
+
+.month-switcher__arrow {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  color: inherit;
+  border-radius: 50%;
+  opacity: 0.72;
+  transition:
+    opacity var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.month-switcher__arrow:hover {
+  opacity: 1;
+  background: var(--surface-muted);
+}
+
+.month-switcher__arrow:active {
+  transform: scale(0.9);
+}
+
+.month-switcher__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 2px;
+  color: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  letter-spacing: 0.01em;
+}
+
+.month-switcher__back {
+  padding: 2px 6px;
+  color: var(--accent);
+  border-radius: var(--radius-pill);
+  background: var(--accent-soft);
+  font-size: 9px;
+  font-weight: 650;
+  letter-spacing: 0.03em;
+}
+
+.month-switcher--dark {
+  color: var(--hero-ink);
+}
+
+.month-switcher--dark .month-switcher__arrow:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.month-switcher--dark .month-switcher__back {
+  color: var(--hero-ink);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.month-switcher--center {
+  justify-content: center;
+}
+
+.month-switcher--center .month-switcher__label {
+  min-width: 96px;
+  justify-content: center;
+}
