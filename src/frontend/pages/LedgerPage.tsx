@@ -7,10 +7,15 @@ import { Icon } from '../components/Icon';
 import { MonthSwitcher } from '../components/MonthSwitcher';
 import { useAsyncResource } from '../hooks/useAsyncResource';
 import { findAccount, findCategory } from '../utils/catalog';
+import { CategoryGroups } from '../features/ledger/CategoryGroups';
 import { LedgerDayGroup } from '../features/ledger/LedgerDayGroup';
 import { LedgerSkeleton } from '../features/ledger/LedgerSkeleton';
 import { MonthlySummary } from '../features/ledger/MonthlySummary';
-import type { LedgerDayGroupData } from '../features/ledger/types';
+import type {
+  LedgerCategoryGroupData,
+  LedgerDayGroupData,
+  LedgerViewMode,
+} from '../features/ledger/types';
 import type { LedgerPageProps } from '../types/page-props';
 import '../styles/ledger.css';
 
@@ -21,10 +26,28 @@ const FILTERS: ReadonlyArray<{ id: EntryFilter; label: string }> = [
 ];
 
 const EMPTY_ENTRIES: Entry[] = [];
+const VIEW_STORAGE_KEY = 'ledgerlite.ui.ledgerView';
+
+function readViewMode(): LedgerViewMode {
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === 'category' ? 'category' : 'timeline';
+  } catch {
+    return 'timeline';
+  }
+}
+
+function rememberViewMode(mode: LedgerViewMode): void {
+  try {
+    window.localStorage.setItem(VIEW_STORAGE_KEY, mode);
+  } catch {
+    // View preference is optional.
+  }
+}
 
 export function LedgerPage({ month, revision, catalog, onMonthChange, onAdd, onEdit }: LedgerPageProps) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<EntryFilter>('all');
+  const [viewMode, setViewMode] = useState<LedgerViewMode>(readViewMode);
   const searchRef = useRef<HTMLInputElement | null>(null);
   const previousMonth = useRef(month);
 
@@ -39,6 +62,10 @@ export function LedgerPage({ month, revision, catalog, onMonthChange, onAdd, onE
     setQuery('');
     setFilter('all');
   }, [month]);
+
+  useEffect(() => {
+    rememberViewMode(viewMode);
+  }, [viewMode]);
 
   const data = resource.data && resource.data.month === month ? resource.data : null;
   const showInitialLoading = data === null && resource.status !== 'error';
@@ -76,6 +103,25 @@ export function LedgerPage({ month, revision, catalog, onMonthChange, onAdd, onE
       else bucket.incomeCents += entry.amountCents;
     }
     return [...buckets.values()].sort((a, b) => b.date.localeCompare(a.date));
+  }, [filteredEntries]);
+
+  const categoryGroups = useMemo<LedgerCategoryGroupData[]>(() => {
+    const buckets = new Map<string, LedgerCategoryGroupData>();
+    for (const entry of filteredEntries) {
+      let bucket = buckets.get(entry.categoryId);
+      if (!bucket) {
+        bucket = {
+          categoryId: entry.categoryId,
+          type: entry.type,
+          entries: [],
+          totalCents: 0,
+        };
+        buckets.set(entry.categoryId, bucket);
+      }
+      bucket.entries.push(entry);
+      bucket.totalCents += entry.amountCents;
+    }
+    return [...buckets.values()].sort((a, b) => b.totalCents - a.totalCents);
   }, [filteredEntries]);
 
   const activeDays = useMemo(() => {
@@ -181,18 +227,30 @@ export function LedgerPage({ month, revision, catalog, onMonthChange, onAdd, onE
               ) : null}
             </div>
 
-            <div className="ledger-filters" role="group" aria-label="按收支筛选">
-              {FILTERS.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`ledger-filters__button ${filter === item.id ? 'is-active' : ''}`}
-                  aria-pressed={filter === item.id}
-                  onClick={() => setFilter(item.id)}
-                >
-                  {item.label}
-                </button>
-              ))}
+            <div className="ledger-filterbar">
+              <div className="ledger-filters" role="group" aria-label="按收支筛选">
+                {FILTERS.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`ledger-filters__button ${filter === item.id ? 'is-active' : ''}`}
+                    aria-pressed={filter === item.id}
+                    onClick={() => setFilter(item.id)}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className={`ledger-view-toggle ${viewMode === 'category' ? 'is-active' : ''}`}
+                aria-label={viewMode === 'timeline' ? '切换为按分类汇总' : '切换为按日明细'}
+                title={viewMode === 'timeline' ? '按分类汇总' : '按日明细'}
+                onClick={() => setViewMode((current) => (current === 'timeline' ? 'category' : 'timeline'))}
+              >
+                <Icon name={viewMode === 'timeline' ? 'archive' : 'ledger'} size={16} />
+                <span>{viewMode === 'timeline' ? '分类' : '按日'}</span>
+              </button>
             </div>
           </div>
 
@@ -229,17 +287,21 @@ export function LedgerPage({ month, revision, catalog, onMonthChange, onAdd, onE
                 </div>
               ) : null}
 
-              <div className="ledger-days">
-                {groups.map((group, index) => (
-                  <LedgerDayGroup
-                    key={group.date}
-                    group={group}
-                    catalog={catalog}
-                    index={index}
-                    onEdit={onEdit}
-                  />
-                ))}
-              </div>
+              {viewMode === 'timeline' ? (
+                <div className="ledger-days">
+                  {groups.map((group, index) => (
+                    <LedgerDayGroup
+                      key={group.date}
+                      group={group}
+                      catalog={catalog}
+                      index={index}
+                      onEdit={onEdit}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <CategoryGroups groups={categoryGroups} catalog={catalog} onEdit={onEdit} />
+              )}
             </>
           )}
         </>

@@ -810,3 +810,319 @@
     min-height: 44px;
   }
 }
+
+/* -------------------------------------------------------------- view mode */
+
+.ledger-filterbar {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.ledger-filterbar .ledger-filters {
+  min-width: 0;
+  flex: 1;
+}
+
+.ledger-view-toggle {
+  display: inline-flex;
+  min-width: 76px;
+  min-height: 48px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 12px;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  font-size: 12px;
+  font-weight: 620;
+  letter-spacing: 0.02em;
+  transition:
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.ledger-view-toggle:hover {
+  color: var(--ink);
+  background: var(--surface-muted);
+}
+
+.ledger-view-toggle:active {
+  transform: scale(0.97);
+}
+
+.ledger-view-toggle.is-active {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 18%, var(--line));
+  background: var(--accent-soft);
+}
+
+/* ------------------------------------------------------------- category groups */
+
+.ledger-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 4px;
+}
+
+.ledger-group-section {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.ledger-group-section__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 5px;
+}
+
+.ledger-group-section__title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.ledger-group-section__mark {
+  width: 3px;
+  height: 14px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--expense);
+}
+
+.ledger-group-section__mark.is-income {
+  background: var(--income);
+}
+
+.ledger-group-section h2 {
+  font-size: 14px;
+  font-weight: 720;
+  letter-spacing: -0.01em;
+}
+
+.ledger-group-section__count {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 560;
+  letter-spacing: 0.06em;
+}
+
+.ledger-group-section__total {
+  color: color-mix(in srgb, var(--expense) 76%, var(--ink));
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.ledger-group-section__total.is-income {
+  color: color-mix(in srgb, var(--income) 78%, var(--ink));
+}
+
+.ledger-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ledger-group {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+  animation: ledger-day-in 440ms var(--ease-out) both;
+  animation-delay: calc(var(--group-index, 0) * 38ms);
+}
+
+.ledger-group__head {
+  display: flex;
+  width: 100%;
+  min-height: 68px;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px 11px 14px;
+  text-align: left;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.ledger-group__head:hover {
+  background: var(--surface-muted);
+}
+
+.ledger-group__head:active {
+  background: var(--surface-strong);
+}
+
+.ledger-group__copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ledger-group__name {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 640;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-group__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 5px;
+  color: var(--muted);
+  font-size: 10.5px;
+  line-height: 1.35;
+}
+
+.ledger-group__meta > span + span::before {
+  padding-right: 5px;
+  content: '·';
+}
+
+.ledger-group__amount {
+  flex: none;
+  color: var(--expense);
+  font-size: 14px;
+  font-weight: 660;
+  letter-spacing: -0.02em;
+}
+
+.ledger-group__amount.is-income {
+  color: var(--income);
+}
+
+.ledger-group__chevron {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  place-items: center;
+  color: var(--muted);
+  border-radius: 50%;
+  background: var(--surface-muted);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.ledger-group.is-open .ledger-group__chevron {
+  transform: rotate(180deg);
+}
+
+.ledger-group__collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--dur-base) var(--ease-soft);
+}
+
+.ledger-group.is-open .ledger-group__collapse {
+  grid-template-rows: 1fr;
+}
+
+.ledger-group__collapse-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ledger-group__entries {
+  margin: 0 8px 8px;
+  padding: 4px;
+  border-top: 1px solid var(--line);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-muted) 72%, transparent);
+}
+
+.ledger-group-entry + .ledger-group-entry {
+  border-top: 1px solid var(--line);
+}
+
+.ledger-group-entry__button {
+  display: flex;
+  width: 100%;
+  min-height: 48px;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 7px;
+  border-radius: 9px;
+  text-align: left;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.ledger-group-entry__button:hover {
+  background: var(--surface);
+}
+
+.ledger-group-entry__date {
+  display: flex;
+  width: 52px;
+  flex: none;
+  flex-direction: column;
+  gap: 1px;
+  color: var(--ink-soft);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.ledger-group-entry__date small {
+  color: var(--faint);
+  font-size: 9px;
+  font-weight: 500;
+}
+
+.ledger-group-entry__copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.ledger-group-entry__note {
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-group-entry__meta {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.ledger-group-entry__amount {
+  flex: none;
+  color: var(--expense);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.ledger-group-entry__amount.is-income {
+  color: var(--income);
+}
+
+@media (min-width: 760px) {
+  .ledger-group-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
