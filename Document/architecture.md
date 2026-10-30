@@ -168,11 +168,14 @@ master bits (256)
 
 ## 7. 导出路径
 
-导出按当前账本生成：数据层返回该账本的明文 `BackupPayload`（含账本名称），由设置页生成文件。
+导出按当前账本生成：数据层返回该账本的 `BackupPayload`（含账本名称），由设置页生成文件。
 
+- 启用加密时，设置页调用 `exportEncryptedBackup`：Worker 使用当前本地密钥把完整 `BackupPayload` 加密为 `EncryptedBackupPayload`，信封只保留 KDF 盐、验证器与 AES-GCM 密文。
+- 导入加密备份时，`importEncryptedBackup` 使用用户输入的口令从信封盐派生密钥，验证后解密；随后按目标账本当前的加密状态重新落库。
+- 未启用加密时，JSON 导出仍是明文 `BackupPayload`；旧版 schema 1/2 明文备份继续可导入。
 - Web：使用 Blob URL 触发浏览器下载。
 - Android：使用 Capacitor Filesystem 将文件写入应用缓存目录，再通过 Capacitor Share 打开系统分享面板。WebView 不提供浏览器式下载目录，因此没有沿用 `<a download>` 路径。
-- 加密账本在导出时仍输出明文文件，设置页会显示相应提示。
+- CSV 始终是明文表格，设置页会显示提示。
 
 ## 8. 扩展路径
 

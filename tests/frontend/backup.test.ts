@@ -4,6 +4,7 @@ import {
   backupFileName,
   buildCsv,
   csvFileName,
+  encryptedBackupFileName,
   formatBackupMoment,
   formatBytes,
   readBackupFile,
@@ -66,6 +67,7 @@ describe('backup helpers', () => {
   it('derives stable file names', () => {
     const now = new Date(2026, 9, 30, 12);
     expect(backupFileName(now)).toBe('ledgerlite-backup-20261030.json');
+    expect(encryptedBackupFileName(now)).toBe('ledgerlite-encrypted-backup-20261030.json');
     expect(csvFileName(now)).toBe('ledgerlite-202610.csv');
   });
 
@@ -90,5 +92,25 @@ describe('backup helpers', () => {
     await expect(readBackupFile(wrongApp)).rejects.toThrow('不是简账备份文件');
     const malformed = new File(['not json'], 'broken.json');
     await expect(readBackupFile(malformed)).rejects.toThrow('文件不是有效的 JSON');
+
+    const encryptedPreview = await readBackupFile(
+      new File(
+        [
+          JSON.stringify({
+            app: 'ledgerlite',
+            kind: 'encrypted-backup',
+            schema: 1,
+            version: '0.1.0-beta',
+            exportedAt: '2026-10-30T10:00:00.000Z',
+            kdf: { name: 'PBKDF2-SHA256', iterations: 310_000, salt: 'c2FsdA==' },
+            verifier: { iv: 'aXY=', data: 'ZGF0YQ==' },
+            cipher: { iv: 'aXY=', data: 'ZGF0YQ==' },
+          }),
+        ],
+        'encrypted.json',
+      ),
+    );
+    expect(encryptedPreview.encrypted).toBe(true);
+    expect(encryptedPreview.entryCount).toBe(0);
   });
 });

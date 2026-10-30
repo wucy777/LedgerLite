@@ -1,6 +1,7 @@
 export const APP_NAME = '简账';
 export const APP_VERSION = '0.1.0-beta';
 export const BACKUP_SCHEMA = 2;
+export const ENCRYPTED_BACKUP_SCHEMA = 1;
 
 export const ENTRY_TYPES = ['expense', 'income'] as const;
 export type EntryType = (typeof ENTRY_TYPES)[number];
@@ -209,6 +210,31 @@ export interface BackupPayload {
   catalog: Catalog;
 }
 
+/**
+ * A portable backup encrypted with the passphrase that protects the local
+ * encrypted store. The envelope itself only contains KDF/cipher metadata.
+ */
+export interface EncryptedBackupPayload {
+  app: 'ledgerlite';
+  kind: 'encrypted-backup';
+  schema: 1;
+  version: string;
+  exportedAt: string;
+  kdf: {
+    name: 'PBKDF2-SHA256';
+    iterations: number;
+    salt: string;
+  };
+  verifier: {
+    iv: string;
+    data: string;
+  };
+  cipher: {
+    iv: string;
+    data: string;
+  };
+}
+
 export interface ImportResult {
   entryCount: number;
   categoryCount: number;
@@ -252,7 +278,12 @@ export interface StorageApi {
   addAccount: { params: { ledgerId: string; account: AccountInput }; result: Catalog };
   updateAccount: { params: { ledgerId: string; id: string; patch: AccountPatch }; result: Catalog };
   exportBackup: { params: { ledgerId: string }; result: BackupPayload };
+  exportEncryptedBackup: { params: { ledgerId: string }; result: EncryptedBackupPayload };
   importBackup: { params: { ledgerId: string; backup: unknown }; result: ImportResult };
+  importEncryptedBackup: {
+    params: { ledgerId: string; passphrase: string; backup: unknown };
+    result: ImportResult;
+  };
   resetAll: { params: void; result: InitResult };
 }
 

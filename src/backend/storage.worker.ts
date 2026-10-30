@@ -47,8 +47,16 @@ async function dispatch(request: RpcRequest): Promise<unknown> {
       return engine.updateAccount(request.params.ledgerId, request.params.id, request.params.patch);
     case 'exportBackup':
       return engine.exportBackup(request.params.ledgerId);
+    case 'exportEncryptedBackup':
+      return engine.exportEncryptedBackup(request.params.ledgerId);
     case 'importBackup':
       return engine.importBackup(request.params.ledgerId, request.params.backup);
+    case 'importEncryptedBackup':
+      return engine.importEncryptedBackup(
+        request.params.ledgerId,
+        request.params.passphrase,
+        request.params.backup,
+      );
     case 'resetAll':
       return engine.resetAll();
     default:

@@ -1684,3 +1684,16 @@
     gap: 6px;
   }
 }
+
+.settings-import-lock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 20%, var(--line));
+  border-radius: 14px;
+  background: var(--accent-wash);
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 600;
+}

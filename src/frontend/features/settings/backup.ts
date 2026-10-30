@@ -1,9 +1,9 @@
 import { formatTime, localDateKey } from '@shared/date';
 import { formatCents } from '@shared/money';
-import type { BackupPayload } from '@shared/types';
+import { ENCRYPTED_BACKUP_SCHEMA, type BackupPayload } from '@shared/types';
 import { isRecord } from '@shared/validation';
 
-const MAX_BACKUP_BYTES = 20 * 1024 * 1024;
+const MAX_BACKUP_BYTES = 32 * 1024 * 1024;
 
 export type ExportOutcome = 'downloaded' | 'shared';
 
@@ -74,6 +74,10 @@ export function backupFileName(now = new Date()): string {
   return `ledgerlite-backup-${localDateKey(now).replaceAll('-', '')}.json`;
 }
 
+export function encryptedBackupFileName(now = new Date()): string {
+  return `ledgerlite-encrypted-backup-${localDateKey(now).replaceAll('-', '')}.json`;
+}
+
 export function csvFileName(now = new Date()): string {
   return `ledgerlite-${localDateKey(now).slice(0, 7).replace('-', '')}.csv`;
 }
@@ -103,6 +107,7 @@ export function buildCsv(payload: BackupPayload): string {
 
 export interface BackupPreview {
   backup: unknown;
+  encrypted: boolean;
   entryCount: number;
   categoryCount: number;
   accountCount: number;
@@ -110,9 +115,36 @@ export interface BackupPreview {
   version: string | null;
 }
 
+function isEncryptedBackup(value: Record<string, unknown>): boolean {
+  if (value.app !== 'ledgerlite') throw new Error('不是简账备份文件');
+  if (value.kind !== 'encrypted-backup') return false;
+  if (value.schema !== ENCRYPTED_BACKUP_SCHEMA) throw new Error('不支持的加密备份版本');
+  if (!isRecord(value.kdf) || value.kdf.name !== 'PBKDF2-SHA256') {
+    throw new Error('加密备份参数无效');
+  }
+  if (typeof value.kdf.iterations !== 'number' || typeof value.kdf.salt !== 'string') {
+    throw new Error('加密备份参数无效');
+  }
+  if (
+    !isRecord(value.verifier) ||
+    typeof value.verifier.iv !== 'string' ||
+    typeof value.verifier.data !== 'string'
+  ) {
+    throw new Error('加密备份校验信息无效');
+  }
+  if (
+    !isRecord(value.cipher) ||
+    typeof value.cipher.iv !== 'string' ||
+    typeof value.cipher.data !== 'string'
+  ) {
+    throw new Error('加密备份密文无效');
+  }
+  return true;
+}
+
 export async function readBackupFile(file: File): Promise<BackupPreview> {
   if (file.size > MAX_BACKUP_BYTES) {
-    throw new Error('备份文件过大，请选择小于 20 MB 的文件');
+    throw new Error('备份文件过大，请选择小于 32 MB 的文件');
   }
   let text: string;
   try {
@@ -128,7 +160,20 @@ export async function readBackupFile(file: File): Promise<BackupPreview> {
     throw new Error('文件不是有效的 JSON');
   }
   if (!isRecord(parsed)) throw new Error('备份数据格式无效');
-  if (parsed.app !== 'ledgerlite') throw new Error('不是简账备份文件');
+  const encrypted = isEncryptedBackup(parsed);
+  const exportedAt = typeof parsed.exportedAt === 'string' ? parsed.exportedAt : null;
+  const version = typeof parsed.version === 'string' ? parsed.version : null;
+  if (encrypted) {
+    return {
+      backup: parsed,
+      encrypted: true,
+      entryCount: 0,
+      categoryCount: 0,
+      accountCount: 0,
+      exportedAt,
+      version,
+    };
+  }
   if (parsed.schema !== 1 && parsed.schema !== 2) throw new Error('不支持的备份版本');
   if (!Array.isArray(parsed.entries)) throw new Error('备份记录格式无效');
   if (!isRecord(parsed.catalog)) throw new Error('备份中的分类与账户格式无效');
@@ -139,11 +184,12 @@ export async function readBackupFile(file: File): Promise<BackupPreview> {
   if (parsed.catalog.accounts.length === 0) throw new Error('备份中没有账户');
   return {
     backup: parsed,
+    encrypted: false,
     entryCount: parsed.entries.length,
     categoryCount: parsed.catalog.categories.length,
     accountCount: parsed.catalog.accounts.length,
-    exportedAt: typeof parsed.exportedAt === 'string' ? parsed.exportedAt : null,
-    version: typeof parsed.version === 'string' ? parsed.version : null,
+    exportedAt,
+    version,
   };
 }
 

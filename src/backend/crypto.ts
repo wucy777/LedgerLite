@@ -5,6 +5,7 @@ export const SALT_BYTES = 16;
 export const IV_BYTES = 12;
 
 export const CATALOG_AAD = 'ledgerlite.catalog.v1';
+export const ENCRYPTED_BACKUP_AAD = 'ledgerlite.encrypted-backup.v1';
 const VERIFIER_AAD = 'ledgerlite.verifier.v1';
 const VERIFIER_PLAINTEXT = 'ledgerlite.verifier.v1';
 const AES_INFO = 'ledgerlite/aes-gcm-256/v1';
@@ -52,6 +53,37 @@ export function randomHex(byteLength: number): string {
     hex += byte.toString(16).padStart(2, '0');
   }
   return hex;
+}
+
+/** Base64 helpers are only used by the portable encrypted-backup envelope. */
+export function bytesToBase64(value: ArrayBuffer): string {
+  let binary = '';
+  for (const byte of new Uint8Array(value)) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+export function base64ToBytes(value: unknown): ArrayBuffer {
+  if (
+    typeof value !== 'string' ||
+    value.length === 0 ||
+    value.length % 4 !== 0 ||
+    !/^[A-Za-z0-9+/]*={0,2}$/.test(value)
+  ) {
+    throw new LedgerError('IMPORT_INVALID', '备份文件格式无效');
+  }
+  let binary: string;
+  try {
+    binary = atob(value);
+  } catch {
+    throw new LedgerError('IMPORT_INVALID', '备份文件格式无效');
+  }
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
 }
 
 /** PBKDF2-SHA256 stretches the passphrase, HKDF splits it into independent AES and MAC keys. */

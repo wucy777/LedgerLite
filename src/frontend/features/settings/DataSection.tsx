@@ -15,6 +15,7 @@ import {
   backupFileName,
   buildCsv,
   csvFileName,
+  encryptedBackupFileName,
   formatBackupMoment,
   formatBytes,
   readBackupFile,
@@ -72,6 +73,7 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
   const [exporting, setExporting] = useState<'json' | 'csv' | null>(null);
   const [fileError, setFileError] = useState('');
   const [importPreview, setImportPreview] = useState<BackupPreview | null>(null);
+  const [importPassphrase, setImportPassphrase] = useState('');
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
@@ -112,10 +114,19 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
     if (exporting) return;
     setExporting('json');
     try {
-      const payload = await client.call('exportBackup', { ledgerId });
+      const payload = encrypted
+        ? await client.call('exportEncryptedBackup', { ledgerId })
+        : await client.call('exportBackup', { ledgerId });
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
-      const outcome = await saveExportFile(blob, backupFileName());
-      showToast(outcome === 'shared' ? '备份已生成，请选择保存位置' : 'JSON 备份已导出', 'success');
+      const outcome = await saveExportFile(blob, encrypted ? encryptedBackupFileName() : backupFileName());
+      showToast(
+        outcome === 'shared'
+          ? '备份已生成，请选择保存位置'
+          : encrypted
+            ? '加密备份已导出'
+            : 'JSON 备份已导出',
+        'success',
+      );
     } catch (reason) {
       showToast(friendlyError(reason, '导出失败，请重试'), 'error');
     } finally {
@@ -144,6 +155,7 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
     if (!file) return;
     setFileError('');
     setImportError('');
+    setImportPassphrase('');
     try {
       const preview = await readBackupFile(file);
       setImportPreview(preview);
@@ -154,15 +166,26 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
 
   function closeImportDialog() {
     setImportPreview(null);
+    setImportPassphrase('');
     setImportError('');
   }
 
   async function handleImport() {
     if (!importPreview || importing) return;
+    if (importPreview.encrypted && !importPassphrase.trim()) {
+      setImportError('请输入加密备份的账本口令');
+      return;
+    }
     setImporting(true);
     setImportError('');
     try {
-      const result = await client.call('importBackup', { ledgerId, backup: importPreview.backup });
+      const result = importPreview.encrypted
+        ? await client.call('importEncryptedBackup', {
+            ledgerId,
+            passphrase: importPassphrase,
+            backup: importPreview.backup,
+          })
+        : await client.call('importBackup', { ledgerId, backup: importPreview.backup });
       onCatalogChange(result.catalog);
       onDataChanged();
       setStorageTick((value) => value + 1);
@@ -218,8 +241,8 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
         <div className="settings-rows">
           <DataRow
             icon="download"
-            title="导出 JSON 备份"
-            description="当前账本的完整记录、分类与账户"
+            title={encrypted ? '导出加密备份' : '导出 JSON 备份'}
+            description={encrypted ? '当前账本，使用账本口令加密' : '当前账本的完整记录、分类与账户'}
             busy={exporting === 'json'}
             disabled={exporting !== null}
             onClick={() => void handleExportJson()}
@@ -235,7 +258,7 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
           <DataRow
             icon="upload"
             title="导入 JSON 备份"
-            description="从备份文件恢复，覆盖当前账本"
+            description="支持加密备份与旧版明文备份"
             disabled={importing || exporting !== null}
             onClick={() => fileInputRef.current?.click()}
           />
@@ -258,7 +281,7 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
         {encrypted ? (
           <p className="settings-export-note">
             <Icon name="info" size={13} />
-            加密账本导出的 JSON 与 CSV 备份为明文文件，请妥善保管。
+            JSON 备份使用当前账本口令加密；CSV 为明文表格，请妥善保管。
           </p>
         ) : null}
 
@@ -295,7 +318,7 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
       {importPreview ? (
         <Dialog
           title="导入备份"
-          eyebrow="将覆盖当前数据"
+          eyebrow="将覆盖当前账本"
           icon="upload"
           size="md"
           dismissOnBackdrop={!importing}
@@ -307,11 +330,16 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
                 className="secondary-button"
                 onClick={closeImportDialog}
                 disabled={importing}
-                data-autofocus
+                data-autofocus={importPreview.encrypted ? undefined : true}
               >
                 取消
               </button>
-              <button type="button" className="primary-button" onClick={() => void handleImport()} disabled={importing}>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => void handleImport()}
+                disabled={importing || (importPreview.encrypted && importPassphrase.trim() === '')}
+              >
                 {importing ? (
                   <>
                     <Icon name="refresh" size={16} className="spin" />
@@ -324,20 +352,53 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
             </>
           }
         >
-          <dl className="settings-import-summary">
-            <div>
-              <dt>记录</dt>
-              <dd className="num">{importPreview.entryCount}</dd>
-            </div>
-            <div>
-              <dt>分类</dt>
-              <dd className="num">{importPreview.categoryCount}</dd>
-            </div>
-            <div>
-              <dt>账户</dt>
-              <dd className="num">{importPreview.accountCount}</dd>
-            </div>
-          </dl>
+          {importPreview.encrypted ? (
+            <>
+              <div className="settings-import-lock">
+                <Icon name="lock" size={16} />
+                <span>加密备份 · 需要账本口令</span>
+              </div>
+              <div className="settings-field">
+                <label className="settings-field__label" htmlFor="settings-import-passphrase">
+                  账本口令
+                </label>
+                <span className={`settings-input${importError ? ' has-error' : ''}`}>
+                  <Icon name="lock" size={16} />
+                  <input
+                    id="settings-import-passphrase"
+                    type="password"
+                    value={importPassphrase}
+                    onChange={(event) => {
+                      setImportPassphrase(event.target.value);
+                      if (importError) setImportError('');
+                    }}
+                    placeholder="输入导出该备份时的账本口令"
+                    autoComplete="current-password"
+                    data-autofocus
+                  />
+                </span>
+              </div>
+              <p className="settings-meta">输入口令后才能校验并解密备份。</p>
+              {!encrypted ? (
+                <p className="settings-meta">当前应用未开启加密，导入后该账本数据将以明文保存。</p>
+              ) : null}
+            </>
+          ) : (
+            <dl className="settings-import-summary">
+              <div>
+                <dt>记录</dt>
+                <dd className="num">{importPreview.entryCount}</dd>
+              </div>
+              <div>
+                <dt>分类</dt>
+                <dd className="num">{importPreview.categoryCount}</dd>
+              </div>
+              <div>
+                <dt>账户</dt>
+                <dd className="num">{importPreview.accountCount}</dd>
+              </div>
+            </dl>
+          )}
           {importPreview.exportedAt ? (
             <p className="settings-meta">
               导出时间：{formatBackupMoment(importPreview.exportedAt)}

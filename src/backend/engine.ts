@@ -7,12 +7,14 @@ import { daysInMonth, localDateKey, monthKeyOfIso } from '../shared/date';
 import { MAX_AMOUNT_CENTS } from '../shared/money';
 import {
   APP_VERSION,
+  ENCRYPTED_BACKUP_SCHEMA,
   LedgerError,
   type Account,
   type AccountInput,
   type AccountPatch,
   type BackupPayload,
   type Catalog,
+  type EncryptedBackupPayload,
   type Category,
   type CategoryInput,
   type CategoryPatch,
@@ -42,7 +44,12 @@ import {
 } from '../shared/validation';
 import {
   CATALOG_AAD,
+  ENCRYPTED_BACKUP_AAD,
+  IV_BYTES,
+  PBKDF2_ITERATIONS,
   SALT_BYTES,
+  base64ToBytes,
+  bytesToBase64,
   createVerifier,
   decryptJson,
   deriveKeys,
@@ -263,6 +270,43 @@ function requireIso(value: unknown, label: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) invalidImport(`${label}无效`);
   return date.toISOString();
+}
+
+function requireEncryptedBlock(value: unknown, label: string): { iv: string; data: string } {
+  if (!isRecord(value) || typeof value.iv !== 'string' || typeof value.data !== 'string') {
+    invalidImport(`${label}格式无效`);
+  }
+  if (base64ToBytes(value.iv).byteLength !== IV_BYTES) invalidImport(`${label} IV 无效`);
+  if (base64ToBytes(value.data).byteLength === 0) invalidImport(`${label}数据无效`);
+  return { iv: value.iv, data: value.data };
+}
+
+function parseEncryptedBackup(value: unknown): EncryptedBackupPayload {
+  if (!isRecord(value)) invalidImport('备份数据格式无效');
+  if (value.app !== 'ledgerlite' || value.kind !== 'encrypted-backup') {
+    invalidImport('不是有效的加密备份文件');
+  }
+  if (value.schema !== ENCRYPTED_BACKUP_SCHEMA) invalidImport('不支持的加密备份版本');
+  if (typeof value.version !== 'string' || value.version.trim() === '') invalidImport('备份版本信息缺失');
+  const exportedAt = requireIso(value.exportedAt, '导出时间');
+  if (!isRecord(value.kdf) || value.kdf.name !== 'PBKDF2-SHA256') invalidImport('备份密钥参数无效');
+  if (value.kdf.iterations !== PBKDF2_ITERATIONS) invalidImport('不支持的备份密钥参数');
+  if (typeof value.kdf.salt !== 'string') invalidImport('备份密钥参数无效');
+  if (base64ToBytes(value.kdf.salt).byteLength !== SALT_BYTES) invalidImport('备份密钥盐值无效');
+  return {
+    app: 'ledgerlite',
+    kind: 'encrypted-backup',
+    schema: ENCRYPTED_BACKUP_SCHEMA,
+    version: value.version,
+    exportedAt,
+    kdf: {
+      name: 'PBKDF2-SHA256',
+      iterations: PBKDF2_ITERATIONS,
+      salt: value.kdf.salt,
+    },
+    verifier: requireEncryptedBlock(value.verifier, '口令验证数据'),
+    cipher: requireEncryptedBlock(value.cipher, '备份密文'),
+  };
 }
 
 function parseBackup(value: unknown): BackupPayload {
@@ -787,6 +831,63 @@ export class LedgerEngine {
       entries,
       catalog: cloneCatalog(catalog),
     };
+  }
+
+  async exportEncryptedBackup(ledgerId: string): Promise<EncryptedBackupPayload> {
+    await this.ensureReady();
+    if (!this.enabled || !this.keys) throw new LedgerError('CONFLICT', '请先启用本地加密');
+    const meta = await this.readCryptoMeta();
+    if (!meta) throw new LedgerError('STORAGE_FAILED', '加密信息缺失');
+    const backup = await this.exportBackup(ledgerId);
+    const cipher = await encryptJson(this.keys, backup, ENCRYPTED_BACKUP_AAD);
+    return {
+      app: 'ledgerlite',
+      kind: 'encrypted-backup',
+      schema: ENCRYPTED_BACKUP_SCHEMA,
+      version: APP_VERSION,
+      exportedAt: backup.exportedAt,
+      kdf: {
+        name: 'PBKDF2-SHA256',
+        iterations: PBKDF2_ITERATIONS,
+        salt: bytesToBase64(meta.salt),
+      },
+      verifier: {
+        iv: bytesToBase64(meta.verifier.iv),
+        data: bytesToBase64(meta.verifier.data),
+      },
+      cipher: {
+        iv: bytesToBase64(cipher.iv),
+        data: bytesToBase64(cipher.data),
+      },
+    };
+  }
+
+  async importEncryptedBackup(
+    ledgerId: string,
+    passphrase: string,
+    backup: unknown,
+  ): Promise<ImportResult> {
+    await this.ensureReady();
+    this.requireLedger(ledgerId);
+    const envelope = parseEncryptedBackup(backup);
+    const salt = base64ToBytes(envelope.kdf.salt);
+    const keys = await deriveKeys(assertPassphrase(passphrase), salt);
+    const verifier: Verifier = {
+      iv: base64ToBytes(envelope.verifier.iv),
+      data: base64ToBytes(envelope.verifier.data),
+    };
+    if (!(await verifyVerifier(keys, verifier))) {
+      throw new LedgerError('INVALID_PASSPHRASE', '口令错误或备份已损坏');
+    }
+    const payload = await decryptJson<BackupPayload>(
+      keys,
+      {
+        iv: base64ToBytes(envelope.cipher.iv),
+        data: base64ToBytes(envelope.cipher.data),
+      },
+      ENCRYPTED_BACKUP_AAD,
+    );
+    return this.importBackup(ledgerId, payload);
   }
 
   async importBackup(ledgerId: string, backup: unknown): Promise<ImportResult> {
