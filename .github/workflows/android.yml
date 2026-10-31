@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: android-${{ github.ref }}
@@ -66,3 +66,13 @@ jobs:
           path: android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
           retention-days: 7
+
+      - name: Publish APK release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v0.1.0-beta
+          name: LedgerLite 0.1.0-beta
+          body: |
+            自动构建的 Android 调试 APK。
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+          prerelease: true
