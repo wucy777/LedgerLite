@@ -73,9 +73,15 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
   };
 
   const playAnimation = (kind: 'dock' | 'undock') => {
+    const nav = findTabbar();
+    nav?.classList.remove('is-fab-docking', 'is-fab-undocking');
+    nav?.classList.add(kind === 'dock' ? 'is-fab-docking' : 'is-fab-undocking');
     setAnimation(kind);
     if (animationTimerRef.current !== null) window.clearTimeout(animationTimerRef.current);
-    animationTimerRef.current = window.setTimeout(() => setAnimation(null), 360);
+    animationTimerRef.current = window.setTimeout(() => {
+      nav?.classList.remove('is-fab-docking', 'is-fab-undocking');
+      setAnimation(null);
+    }, 360);
   };
 
   useLayoutEffect(() => {
@@ -86,6 +92,7 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
   useEffect(() => {
     return () => {
       setDropTargetClass(false);
+      findTabbar()?.classList.remove('is-fab-docking', 'is-fab-undocking');
       if (animationTimerRef.current !== null) window.clearTimeout(animationTimerRef.current);
     };
   }, []);
@@ -137,10 +144,9 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
     if (event.cancelable) event.preventDefault();
     const nav = findTabbar();
     const navRect = nav?.getBoundingClientRect();
-    const maxTop = navRect ? navRect.top - NAV_GAP - FLOAT_SIZE : window.innerHeight - FLOAT_SIZE - 12;
     const next = {
       left: clamp(event.clientX - FLOAT_SIZE / 2, 8, window.innerWidth - FLOAT_SIZE - 8),
-      top: clamp(event.clientY - FLOAT_SIZE / 2, 12, Math.max(12, maxTop)),
+      top: clamp(event.clientY - FLOAT_SIZE / 2, 8, window.innerHeight - FLOAT_SIZE - 8),
     };
     setPosition(next);
 
@@ -184,11 +190,7 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
         if (!current) return current;
         return {
           left: clamp(current.left, 8, window.innerWidth - FLOAT_SIZE - 8),
-          top: clamp(
-            current.top,
-            12,
-            navRect ? Math.max(12, navRect.top - NAV_GAP - FLOAT_SIZE) : window.innerHeight - FLOAT_SIZE - 12,
-          ),
+          top: clamp(current.top, 8, window.innerHeight - FLOAT_SIZE - 8),
         };
       });
     }
@@ -205,24 +207,59 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
   };
 
   const size = docked ? DOCK_SIZE : FLOAT_SIZE;
+  const nav = findTabbar();
+  const navRect = nav?.getBoundingClientRect();
+  const bridge =
+    position && navRect && (dropTarget || animation === 'undock')
+      ? (() => {
+          const fabCenterX = position.left + size / 2;
+          const fabCenterY = position.top + size / 2;
+          const dockX = navRect.right - DOCK_RIGHT - DOCK_SIZE / 2;
+          const dockY = navRect.top + navRect.height / 2;
+          const dx = dockX - fabCenterX;
+          const dy = dockY - fabCenterY;
+          const length = Math.hypot(dx, dy);
+          if (length < 12 || length > 180) return null;
+          return {
+            left: fabCenterX,
+            top: fabCenterY - 9,
+            width: length,
+            transform: `rotate(${Math.atan2(dy, dx)}rad)`,
+          };
+        })()
+      : null;
 
   return (
-    <button
-      ref={buttonRef}
-      type="button"
-      className={`quick-add${docked ? ' is-docked' : ''}${dragging ? ' is-dragging' : ''}${
-        animation ? ` is-${animation}ing` : ''
-      }`}
-      style={position ? { left: position.left, top: position.top, width: size, height: size } : undefined}
-      aria-label="记一笔，按住可拖动，拖到底部导航栏可入栏"
-      title="记一笔 · 按住拖动"
-      onClick={handleClick}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={(event) => finishDrag(event, false)}
-      onPointerCancel={(event) => finishDrag(event, true)}
-    >
-      <Icon name="plus" size={docked ? 21 : 23} strokeWidth={2.1} />
-    </button>
+    <>
+      {bridge ? (
+        <span
+          className="quick-add__bridge"
+          style={{
+            left: bridge.left,
+            top: bridge.top,
+            width: bridge.width,
+            transform: bridge.transform,
+          }}
+          aria-hidden="true"
+        />
+      ) : null}
+      <button
+        ref={buttonRef}
+        type="button"
+        className={`quick-add${docked ? ' is-docked' : ''}${dragging ? ' is-dragging' : ''}${
+          dropTarget ? ' is-near-dock' : ''
+        }${animation ? ` is-${animation}ing` : ''}`}
+        style={position ? { left: position.left, top: position.top, width: size, height: size } : undefined}
+        aria-label="记一笔，按住可拖动，拖到底部导航栏可入栏"
+        title="记一笔 · 按住拖动"
+        onClick={handleClick}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={(event) => finishDrag(event, false)}
+        onPointerCancel={(event) => finishDrag(event, true)}
+      >
+        <Icon name="plus" size={docked ? 21 : 23} strokeWidth={2.1} />
+      </button>
+    </>
   );
 }
