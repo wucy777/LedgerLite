@@ -10,6 +10,7 @@ interface MonthSwitcherProps {
 
 export function MonthSwitcher({ month, onChange, tone = 'default', align = 'left' }: MonthSwitcherProps) {
   const current = currentMonthKey();
+  const isCurrent = month === current;
   return (
     <div className={`month-switcher month-switcher--${tone} month-switcher--${align}`}>
       <button
@@ -23,11 +24,11 @@ export function MonthSwitcher({ month, onChange, tone = 'default', align = 'left
       <button
         type="button"
         className="month-switcher__label"
-        aria-label={`${monthLabel(month)}，回到本月`}
+        aria-label={isCurrent ? `${monthLabel(month)}，当前月份` : `${monthLabel(month)}，回到本月`}
         onClick={() => onChange(current)}
       >
-        <span>{monthLabel(month)}</span>
-        {month !== current ? <span className="month-switcher__back">本月</span> : null}
+        <span className="month-switcher__month">{monthLabel(month)}</span>
+        {isCurrent ? <span className="month-switcher__current">本月</span> : null}
       </button>
       <button
         type="button"
@@ -37,6 +38,18 @@ export function MonthSwitcher({ month, onChange, tone = 'default', align = 'left
       >
         <Icon name="chevron-right" size={18} />
       </button>
+      {isCurrent ? null : (
+        <button
+          type="button"
+          className="month-switcher__today"
+          aria-label="回到本月"
+          title="回到本月"
+          onClick={() => onChange(current)}
+        >
+          <Icon name="refresh" size={13} />
+          <span className="month-switcher__today-text">回本月</span>
+        </button>
+      )}
     </div>
   );
 }

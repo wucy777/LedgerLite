@@ -21,6 +21,7 @@
   font-weight: 650;
   letter-spacing: 0.19em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .ledger-head__title {
