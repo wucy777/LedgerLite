@@ -7,6 +7,7 @@ import { BrandMark } from './components/BrandMark';
 import { Icon } from './components/Icon';
 import { LockScreen } from './components/LockScreen';
 import { PageSkeleton } from './components/PageSkeleton';
+import { QuickAddFab } from './components/QuickAddFab';
 import { ToastProvider, useToast } from './components/ToastProvider';
 import { LedgerSheet, LedgerTrigger } from './features/ledger/LedgerSwitcher';
 import { LedgerPage } from './pages/LedgerPage';
@@ -69,6 +70,7 @@ function AppController() {
   const [activeLedger, setActiveLedger] = useState<Ledger | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [ledgerSheetOpen, setLedgerSheetOpen] = useState(false);
+  const [fabDocked, setFabDocked] = useState(false);
   const [tab, setTab] = useState<TabId>('ledger');
   const [month, setMonth] = useState(() => currentMonthKey());
   const [revision, setRevision] = useState(0);
@@ -402,10 +404,8 @@ function AppController() {
         </main>
 
         <div className="tabbar-wrap">
-          <button type="button" className="tab-fab" aria-label="记一笔" onClick={openAdd}>
-            <Icon name="plus" size={23} strokeWidth={2.1} />
-          </button>
-          <nav className="tabbar" aria-label="底部导航">
+          <QuickAddFab docked={fabDocked} onDockChange={setFabDocked} onAdd={openAdd} />
+          <nav className={`tabbar${fabDocked ? ' tabbar--fab-docked' : ''}`} aria-label="底部导航">
             <button
               type="button"
               className={`tab ${tab === 'ledger' ? 'is-active' : ''}`}

@@ -203,35 +203,6 @@
   transform: translateY(-1px) scale(1.06);
 }
 
-.tab-fab {
-  position: absolute;
-  right: calc(18px + env(safe-area-inset-right, 0px));
-  bottom: calc(10px + var(--safe-bottom) + var(--tabbar-height) + 12px);
-  display: grid;
-  width: 56px;
-  height: 56px;
-  place-items: center;
-  color: var(--accent-ink);
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow:
-    0 14px 24px -10px color-mix(in srgb, var(--accent) 70%, transparent),
-    inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  pointer-events: auto;
-  transition:
-    filter var(--dur-fast) ease,
-    transform var(--dur-fast) var(--ease-out);
-}
-
-.tab-fab:hover {
-  filter: brightness(1.05);
-}
-
-.tab-fab:active {
-  filter: brightness(1.05);
-  transform: scale(0.94);
-}
-
 .rail {
   display: none;
 }

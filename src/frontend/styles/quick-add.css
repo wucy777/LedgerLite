@@ -1,0 +1,102 @@
+.quick-add {
+  position: fixed;
+  z-index: 40;
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: var(--accent-ink);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow:
+    0 14px 24px -10px color-mix(in srgb, var(--accent) 70%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  transition:
+    left 320ms cubic-bezier(0.2, 0.85, 0.2, 1.15),
+    top 320ms cubic-bezier(0.2, 0.85, 0.2, 1.15),
+    width 260ms cubic-bezier(0.2, 0.85, 0.2, 1.15),
+    height 260ms cubic-bezier(0.2, 0.85, 0.2, 1.15),
+    border-radius 260ms var(--ease-out),
+    box-shadow 260ms var(--ease-out);
+}
+
+.quick-add.is-docked {
+  border-radius: 14px;
+  box-shadow:
+    0 8px 18px -10px color-mix(in srgb, var(--accent) 66%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.quick-add.is-dragging {
+  z-index: 45;
+  cursor: grabbing;
+  transition: none;
+  box-shadow:
+    0 20px 30px -12px color-mix(in srgb, var(--accent) 72%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+
+.quick-add.is-docking {
+  animation: quick-add-dock 360ms cubic-bezier(0.2, 0.85, 0.2, 1.15);
+}
+
+.quick-add.is-undocking {
+  animation: quick-add-undock 300ms cubic-bezier(0.2, 0.85, 0.2, 1.15);
+}
+
+.quick-add:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.tabbar.tabbar--fab-docked {
+  padding-right: 66px;
+  transition: padding-right 280ms var(--ease-out);
+}
+
+.tabbar.is-fab-drop-target {
+  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
+  box-shadow:
+    0 0 0 3px var(--accent-wash),
+    var(--shadow-lg);
+}
+
+@keyframes quick-add-dock {
+  0% {
+    transform: scale(1.12);
+  }
+  58% {
+    transform: scale(0.9);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes quick-add-undock {
+  0% {
+    transform: scale(0.92);
+  }
+  62% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .quick-add,
+  .tabbar.tabbar--fab-docked {
+    transition-duration: 0s;
+  }
+
+  .quick-add.is-docking,
+  .quick-add.is-undocking {
+    animation: none;
+  }
+}
