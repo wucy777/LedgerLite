@@ -1,5 +1,6 @@
 .tabbar {
   position: relative;
+  z-index: 2;
 }
 
 .quick-add {
@@ -65,11 +66,6 @@
   z-index: -1;
 }
 
-.quick-add.is-near-dock::before {
-  opacity: 0.72;
-  transform: scale(1.05);
-}
-
 .quick-add.is-docking {
   animation: quick-add-dock 360ms cubic-bezier(0.2, 0.85, 0.2, 1.15);
 }
@@ -83,17 +79,35 @@
   animation: quick-add-membrane 360ms cubic-bezier(0.2, 0.85, 0.2, 1.15);
 }
 
-.quick-add__bridge {
-  position: fixed;
-  z-index: 39;
-  height: 30px;
-  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface) 78%, transparent);
-  box-shadow: 0 12px 26px -16px rgba(31, 39, 32, 0.5);
-  backdrop-filter: blur(9px);
+.quick-add__filter-defs {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
   pointer-events: none;
-  transform-origin: 0 50%;
+}
+
+.quick-add__goo {
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  filter: url('#quick-add-goo');
+}
+
+.quick-add__goo-nav,
+.quick-add__goo-fab {
+  position: absolute;
+  display: block;
+  background: var(--accent-soft);
+}
+
+.quick-add__goo-nav {
+  border-radius: 26px;
+}
+
+.quick-add__goo-fab {
+  border-radius: 50%;
 }
 
 .quick-add:focus-visible {

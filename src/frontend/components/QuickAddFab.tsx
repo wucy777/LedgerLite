@@ -209,39 +209,45 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
   const size = docked ? DOCK_SIZE : FLOAT_SIZE;
   const nav = findTabbar();
   const navRect = nav?.getBoundingClientRect();
-  const bridge =
-    position && navRect && (dropTarget || animation === 'undock')
-      ? (() => {
-          const fabCenterX = position.left + size / 2;
-          const fabCenterY = position.top + size / 2;
-          const dockX = navRect.right - DOCK_RIGHT - DOCK_SIZE / 2;
-          const dockY = navRect.top + navRect.height / 2;
-          const dx = dockX - fabCenterX;
-          const dy = dockY - fabCenterY;
-          const length = Math.hypot(dx, dy);
-          if (length < 12 || length > 180) return null;
-          return {
-            left: fabCenterX,
-            top: fabCenterY - 9,
-            width: length,
-            transform: `rotate(${Math.atan2(dy, dx)}rad)`,
-          };
-        })()
-      : null;
+  const showMembrane = Boolean(position && navRect && (dropTarget || animation));
 
   return (
     <>
-      {bridge ? (
-        <span
-          className="quick-add__bridge"
-          style={{
-            left: bridge.left,
-            top: bridge.top,
-            width: bridge.width,
-            transform: bridge.transform,
-          }}
-          aria-hidden="true"
-        />
+      <svg className="quick-add__filter-defs" aria-hidden="true" focusable="false">
+        <defs>
+          <filter id="quick-add-goo" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
+            <feColorMatrix
+              in="blur"
+              mode="matrix"
+              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"
+              result="goo"
+            />
+          </filter>
+        </defs>
+      </svg>
+      {showMembrane && position && navRect ? (
+        <div className="quick-add__goo" aria-hidden="true">
+          <span
+            className="quick-add__goo-nav"
+            style={{
+              left: navRect.left,
+              top: navRect.top,
+              width: navRect.width,
+              height: navRect.height,
+            }}
+          />
+          <span
+            className="quick-add__goo-fab"
+            style={{
+              left: position.left - 16,
+              top: position.top - 16,
+              width: size + 32,
+              height: size + 32,
+              borderRadius: docked ? 30 : '50%',
+            }}
+          />
+        </div>
       ) : null}
       <button
         ref={buttonRef}
