@@ -50,12 +50,24 @@
 
 .quick-add::before {
   position: absolute;
-  inset: -6px;
-  border: 1.5px solid color-mix(in srgb, var(--accent) 42%, transparent);
-  border-radius: inherit;
+  inset: -10px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 82%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  box-shadow: 0 12px 28px -16px rgba(31, 39, 32, 0.45);
+  backdrop-filter: blur(7px);
   content: '';
   opacity: 0;
   pointer-events: none;
+  transition:
+    opacity 180ms ease,
+    transform 240ms var(--ease-out);
+  z-index: -1;
+}
+
+.quick-add.is-near-dock::before {
+  opacity: 0.72;
+  transform: scale(1.05);
 }
 
 .quick-add.is-docking {
@@ -74,10 +86,12 @@
 .quick-add__bridge {
   position: fixed;
   z-index: 39;
-  height: 18px;
+  height: 30px;
+  border: 1px solid color-mix(in srgb, var(--line-strong) 72%, transparent);
   border-radius: 999px;
-  background: color-mix(in srgb, var(--accent) 48%, transparent);
-  filter: blur(0.6px);
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  box-shadow: 0 12px 26px -16px rgba(31, 39, 32, 0.5);
+  backdrop-filter: blur(9px);
   pointer-events: none;
   transform-origin: 0 50%;
 }
@@ -135,16 +149,16 @@
 
 @keyframes quick-add-membrane {
   0% {
-    opacity: 0.55;
-    transform: scale(0.92);
+    opacity: 0.82;
+    transform: scale(0.94);
   }
   68% {
-    opacity: 0.18;
-    transform: scale(1.45);
+    opacity: 0.28;
+    transform: scale(1.35);
   }
   100% {
     opacity: 0;
-    transform: scale(1.65);
+    transform: scale(1.5);
   }
 }
 
@@ -215,7 +229,11 @@
   }
 
   .quick-add.is-docking,
-  .quick-add.is-undocking {
+  .quick-add.is-undocking,
+  .quick-add.is-docking::before,
+  .quick-add.is-undocking::before,
+  .tabbar.is-fab-docking::after,
+  .tabbar.is-fab-undocking::after {
     animation: none;
   }
 }
