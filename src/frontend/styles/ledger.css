@@ -1127,3 +1127,9 @@
     align-items: start;
   }
 }
+
+@media (max-width: 979px) {
+  .ledger-empty > .primary-button {
+    display: none;
+  }
+}

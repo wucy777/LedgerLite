@@ -402,6 +402,9 @@ function AppController() {
         </main>
 
         <div className="tabbar-wrap">
+          <button type="button" className="tab-fab" aria-label="记一笔" onClick={openAdd}>
+            <Icon name="plus" size={23} strokeWidth={2.1} />
+          </button>
           <nav className="tabbar" aria-label="底部导航">
             <button
               type="button"
@@ -420,9 +423,6 @@ function AppController() {
             >
               <Icon name="chart" size={20} />
               <span>统计</span>
-            </button>
-            <button type="button" className="tab tab--add" aria-label="记一笔" onClick={openAdd}>
-              <Icon name="plus" size={23} strokeWidth={2.1} />
             </button>
             <button
               type="button"
