@@ -62,14 +62,16 @@
 .quick-add__neck {
   position: fixed;
   z-index: 3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: visible;
   pointer-events: none;
   filter: drop-shadow(0 8px 12px color-mix(in srgb, var(--ink) 13%, transparent));
-  transform-origin: 50% 100%;
 }
 
 .quick-add__neck-fill {
-  fill: var(--surface);
+  fill: url('#quick-add-neck-fill');
 }
 
 .quick-add__neck-line {
@@ -77,14 +79,6 @@
   stroke: color-mix(in srgb, var(--line-strong) 82%, transparent);
   stroke-width: 1;
   vector-effect: non-scaling-stroke;
-}
-
-.quick-add__neck.is-docking {
-  animation: quick-add-neck-in 360ms cubic-bezier(0.2, 0.9, 0.2, 1.15) both;
-}
-
-.quick-add__neck.is-undocking {
-  animation: quick-add-neck-out 300ms cubic-bezier(0.2, 0.9, 0.2, 1.15) both;
 }
 
 @keyframes quick-add-dock {
@@ -111,36 +105,6 @@
   }
 }
 
-@keyframes quick-add-neck-in {
-  0% {
-    opacity: 0;
-    transform: translateY(10px) scaleX(0.7) scaleY(0.65);
-  }
-  55% {
-    opacity: 1;
-    transform: translateY(-2px) scaleX(1.04) scaleY(1.04);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@keyframes quick-add-neck-out {
-  0% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-  65% {
-    opacity: 0.7;
-    transform: translateY(-3px) scaleX(1.03) scaleY(1.02);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(8px) scaleX(0.72) scaleY(0.6);
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .quick-add,
   .tabbar.tabbar--fab-docked {
@@ -148,9 +112,7 @@
   }
 
   .quick-add.is-docking,
-  .quick-add.is-undocking,
-  .quick-add__neck.is-docking,
-  .quick-add__neck.is-undocking {
+  .quick-add.is-undocking {
     animation: none;
   }
 }

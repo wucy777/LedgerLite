@@ -27,8 +27,7 @@ const EDGE = 18;
 const NAV_GAP = 12;
 const DOCK_FROM_RIGHT = 48;
 const DOCK_ABOVE_NAV = 24;
-const NECK_WIDTH = 104;
-const NECK_HEIGHT = 40;
+const NECK_NEAR = 58;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -53,6 +52,28 @@ function dockedPosition(nav: HTMLElement): { left: number; top: number } {
     left: rect.right - DOCK_FROM_RIGHT - SIZE / 2,
     top: rect.top - DOCK_ABOVE_NAV,
   };
+}
+
+/**
+ * The neck is generated against the live circle position so the navigation
+ * bar silhouette continuously stretches toward the button while it is dragged.
+ */
+function neckPath(cx: number, cy: number, navTop: number): string {
+  const radius = SIZE / 2;
+  const baseY = navTop + 1;
+  const baseHalf = 46;
+  const attachX = radius * 0.866;
+  const attachY = radius * 0.5;
+  const leftX = cx - attachX;
+  const rightX = cx + attachX;
+  const attachTop = cy - attachY;
+  return [
+    `M ${cx - baseHalf} ${baseY}`,
+    `C ${cx - baseHalf} ${baseY - 16} ${leftX - 14} ${attachTop + 22} ${leftX} ${attachTop}`,
+    `A ${radius} ${radius} 0 0 1 ${rightX} ${attachTop}`,
+    `C ${rightX + 14} ${attachTop + 22} ${cx + baseHalf} ${baseY - 16} ${cx + baseHalf} ${baseY}`,
+    'Z',
+  ].join(' ');
 }
 
 /**
@@ -181,39 +202,35 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
 
   const nav = findTabbar();
   const navRect = nav?.getBoundingClientRect();
-  const neck =
-    navRect && (docked || animation)
-      ? {
-          left: navRect.right - DOCK_FROM_RIGHT - NECK_WIDTH / 2,
-          top: navRect.top - NECK_HEIGHT + 2,
-        }
-      : null;
+  const isDragging = dragging || dragRef.current?.moved === true;
+  const neckVisible =
+    !!navRect &&
+    !!position &&
+    (docked ||
+      animation !== null ||
+      (isDragging && position.top + SIZE > navRect.top - NECK_NEAR));
+  const neck = neckVisible && position && navRect
+    ? neckPath(position.left + SIZE / 2, position.top + SIZE / 2, navRect.top)
+    : null;
 
   return (
     <>
       {neck ? (
-        <svg
-          className={`quick-add__neck${animation ? ` is-${animation}ing` : ''}`}
-          style={{ left: neck.left, top: neck.top }}
-          width={NECK_WIDTH}
-          height={NECK_HEIGHT}
-          viewBox={`0 0 ${NECK_WIDTH} ${NECK_HEIGHT}`}
-          aria-hidden="true"
-        >
-          <path
-            className="quick-add__neck-fill"
-            d="M4 40 C 18 40 16 27 30 18 C 38 12 45 9 52 9 C 59 9 66 12 74 18 C 88 27 86 40 100 40 Z"
-          />
-          <path
-            className="quick-add__neck-line"
-            d="M4 40 C 18 40 16 27 30 18 C 38 12 45 9 52 9 C 59 9 66 12 74 18 C 88 27 86 40 100 40"
-          />
+        <svg className="quick-add__neck" width="100%" height="100%" aria-hidden="true">
+          <defs>
+            <linearGradient id="quick-add-neck-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stopColor="var(--accent-soft)" stopOpacity="0.96" />
+              <stop offset="1" stopColor="var(--surface)" stopOpacity="0.98" />
+            </linearGradient>
+          </defs>
+          <path className="quick-add__neck-fill" d={neck} />
+          <path className="quick-add__neck-line" d={neck.replace(/ Z$/, '')} />
         </svg>
       ) : null}
       <button
         ref={buttonRef}
         type="button"
-        className={`quick-add${docked ? ' is-docked' : ''}${dragging ? ' is-dragging' : ''}${
+        className={`quick-add${docked ? ' is-docked' : ''}${isDragging ? ' is-dragging' : ''}${
           animation ? ` is-${animation}ing` : ''
         }`}
         style={position ? { left: position.left, top: position.top, width: SIZE, height: SIZE } : undefined}
