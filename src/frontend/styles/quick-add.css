@@ -21,18 +21,14 @@
   touch-action: none;
   user-select: none;
   transition:
-    left 320ms cubic-bezier(0.2, 0.85, 0.2, 1.15),
-    top 320ms cubic-bezier(0.2, 0.85, 0.2, 1.15),
-    width 260ms cubic-bezier(0.2, 0.85, 0.2, 1.15),
-    height 260ms cubic-bezier(0.2, 0.85, 0.2, 1.15),
-    border-radius 260ms var(--ease-out),
+    left 360ms cubic-bezier(0.2, 0.9, 0.2, 1.1),
+    top 360ms cubic-bezier(0.2, 0.9, 0.2, 1.1),
     box-shadow 260ms var(--ease-out);
 }
 
 .quick-add.is-docked {
-  border-radius: 14px;
   box-shadow:
-    0 8px 18px -10px color-mix(in srgb, var(--accent) 66%, transparent),
+    0 10px 20px -10px color-mix(in srgb, var(--accent) 66%, transparent),
     inset 0 1px 0 rgba(255, 255, 255, 0.14);
 }
 
@@ -45,69 +41,12 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.18);
 }
 
-.quick-add.is-near-dock {
-  border-radius: 46% 46% 38% 38% / 52% 52% 44% 44%;
-}
-
-.quick-add::before {
-  position: absolute;
-  inset: -10px;
-  border: 1px solid color-mix(in srgb, var(--line-strong) 82%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--surface) 72%, transparent);
-  box-shadow: 0 12px 28px -16px rgba(31, 39, 32, 0.45);
-  backdrop-filter: blur(7px);
-  content: '';
-  opacity: 0;
-  pointer-events: none;
-  transition:
-    opacity 180ms ease,
-    transform 240ms var(--ease-out);
-  z-index: -1;
-}
-
 .quick-add.is-docking {
-  animation: quick-add-dock 360ms cubic-bezier(0.2, 0.85, 0.2, 1.15);
+  animation: quick-add-dock 360ms cubic-bezier(0.2, 0.9, 0.2, 1.15);
 }
 
 .quick-add.is-undocking {
-  animation: quick-add-undock 300ms cubic-bezier(0.2, 0.85, 0.2, 1.15);
-}
-
-.quick-add.is-docking::before,
-.quick-add.is-undocking::before {
-  animation: quick-add-membrane 360ms cubic-bezier(0.2, 0.85, 0.2, 1.15);
-}
-
-.quick-add__filter-defs {
-  position: absolute;
-  width: 0;
-  height: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.quick-add__goo {
-  position: fixed;
-  z-index: 1;
-  inset: 0;
-  pointer-events: none;
-  filter: url('#quick-add-goo');
-}
-
-.quick-add__goo-nav,
-.quick-add__goo-fab {
-  position: absolute;
-  display: block;
-  background: var(--accent-soft);
-}
-
-.quick-add__goo-nav {
-  border-radius: 26px;
-}
-
-.quick-add__goo-fab {
-  border-radius: 50%;
+  animation: quick-add-undock 300ms cubic-bezier(0.2, 0.9, 0.2, 1.15);
 }
 
 .quick-add:focus-visible {
@@ -116,123 +55,89 @@
 }
 
 .tabbar.tabbar--fab-docked {
-  padding-right: 66px;
-  transition: padding-right 280ms var(--ease-out);
+  padding-right: 92px;
+  transition: padding-right 300ms var(--ease-out);
 }
 
-.tabbar.is-fab-drop-target {
-  border-color: color-mix(in srgb, var(--accent) 44%, transparent);
-  box-shadow:
-    0 0 0 3px var(--accent-wash),
-    var(--shadow-lg);
-}
-
-.tabbar::after {
-  position: absolute;
-  top: 50%;
-  right: 7px;
-  width: 56px;
-  height: 56px;
-  border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, var(--accent) 28%, transparent) 0 42%,
-    transparent 72%
-  );
-  content: '';
-  opacity: 0;
+.quick-add__neck {
+  position: fixed;
+  z-index: 3;
+  overflow: visible;
   pointer-events: none;
-  transform: translateY(-50%) scale(0.45);
-  transition:
-    opacity 180ms ease,
-    transform 220ms var(--ease-out);
+  filter: drop-shadow(0 8px 12px color-mix(in srgb, var(--ink) 13%, transparent));
+  transform-origin: 50% 100%;
 }
 
-.tabbar.is-fab-drop-target::after {
-  opacity: 1;
-  transform: translateY(-50%) scale(1.15);
+.quick-add__neck-fill {
+  fill: var(--surface);
 }
 
-.tabbar.is-fab-docking::after {
-  animation: tabbar-engulf 360ms cubic-bezier(0.2, 0.85, 0.2, 1.15);
+.quick-add__neck-line {
+  fill: none;
+  stroke: color-mix(in srgb, var(--line-strong) 82%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
 
-.tabbar.is-fab-undocking::after {
-  animation: tabbar-release 360ms cubic-bezier(0.2, 0.85, 0.2, 1.15);
+.quick-add__neck.is-docking {
+  animation: quick-add-neck-in 360ms cubic-bezier(0.2, 0.9, 0.2, 1.15) both;
 }
 
-@keyframes quick-add-membrane {
-  0% {
-    opacity: 0.82;
-    transform: scale(0.94);
-  }
-  68% {
-    opacity: 0.28;
-    transform: scale(1.35);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(1.5);
-  }
-}
-
-@keyframes tabbar-engulf {
-  0% {
-    opacity: 0.25;
-    transform: translateY(-50%) scale(0.45);
-  }
-  55% {
-    opacity: 0.9;
-    transform: translateY(-50%) scale(1.35);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-50%) scale(0.9);
-  }
-}
-
-@keyframes tabbar-release {
-  0% {
-    opacity: 0.8;
-    transform: translateY(-50%) scale(0.65);
-  }
-  55% {
-    opacity: 0.5;
-    transform: translateY(-50%) scale(1.35);
-  }
-  100% {
-    opacity: 0;
-    transform: translateY(-50%) scale(1);
-  }
+.quick-add__neck.is-undocking {
+  animation: quick-add-neck-out 300ms cubic-bezier(0.2, 0.9, 0.2, 1.15) both;
 }
 
 @keyframes quick-add-dock {
   0% {
-    border-radius: 50%;
-    transform: scale(1.12);
+    transform: scale(1.08);
   }
   58% {
-    border-radius: 36% 36% 26% 26% / 42% 42% 30% 30%;
-    transform: scale(0.88);
+    transform: scale(0.94);
   }
   100% {
-    border-radius: 14px;
     transform: scale(1);
   }
 }
 
 @keyframes quick-add-undock {
   0% {
-    border-radius: 14px;
-    transform: scale(0.92);
+    transform: scale(0.94);
   }
   62% {
-    border-radius: 48% 48% 36% 36% / 54% 54% 44% 44%;
-    transform: scale(1.06);
+    transform: scale(1.04);
   }
   100% {
-    border-radius: 50%;
     transform: scale(1);
+  }
+}
+
+@keyframes quick-add-neck-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scaleX(0.7) scaleY(0.65);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-2px) scaleX(1.04) scaleY(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes quick-add-neck-out {
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  65% {
+    opacity: 0.7;
+    transform: translateY(-3px) scaleX(1.03) scaleY(1.02);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(8px) scaleX(0.72) scaleY(0.6);
   }
 }
 
@@ -244,10 +149,8 @@
 
   .quick-add.is-docking,
   .quick-add.is-undocking,
-  .quick-add.is-docking::before,
-  .quick-add.is-undocking::before,
-  .tabbar.is-fab-docking::after,
-  .tabbar.is-fab-undocking::after {
+  .quick-add__neck.is-docking,
+  .quick-add__neck.is-undocking {
     animation: none;
   }
 }

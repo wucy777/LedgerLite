@@ -22,11 +22,13 @@ interface DragState {
   wasDocked: boolean;
 }
 
-const FLOAT_SIZE = 56;
-const DOCK_SIZE = 44;
+const SIZE = 56;
 const EDGE = 18;
 const NAV_GAP = 12;
-const DOCK_RIGHT = 10;
+const DOCK_FROM_RIGHT = 48;
+const DOCK_ABOVE_NAV = 24;
+const NECK_WIDTH = 104;
+const NECK_HEIGHT = 40;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -38,9 +40,9 @@ function findTabbar(): HTMLElement | null {
 
 function floatingPosition(nav: HTMLElement | null): { left: number; top: number } {
   const navRect = nav?.getBoundingClientRect();
-  const top = navRect ? navRect.top - NAV_GAP - FLOAT_SIZE : window.innerHeight - 160;
+  const top = navRect ? navRect.top - NAV_GAP - SIZE : window.innerHeight - 160;
   return {
-    left: Math.max(8, window.innerWidth - EDGE - FLOAT_SIZE),
+    left: Math.max(8, window.innerWidth - EDGE - SIZE),
     top: Math.max(12, top),
   };
 }
@@ -48,15 +50,14 @@ function floatingPosition(nav: HTMLElement | null): { left: number; top: number 
 function dockedPosition(nav: HTMLElement): { left: number; top: number } {
   const rect = nav.getBoundingClientRect();
   return {
-    left: rect.right - DOCK_RIGHT - DOCK_SIZE,
-    top: rect.top + (rect.height - DOCK_SIZE) / 2,
+    left: rect.right - DOCK_FROM_RIGHT - SIZE / 2,
+    top: rect.top - DOCK_ABOVE_NAV,
   };
 }
 
 /**
- * A press-and-drag quick-add control. It starts floating above the bottom
- * navigation and docks into its right edge when dropped on the bar. No long
- * press is required: the drag threshold is only a few pixels.
+ * Press-and-drag quick-add control. It follows the finger into the navigation
+ * bar and docks into a rounded fusion neck cut into the top edge of the bar.
  */
 export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -65,23 +66,12 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
   const animationTimerRef = useRef<number | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const [dragging, setDragging] = useState(false);
-  const [dropTarget, setDropTarget] = useState(false);
   const [animation, setAnimation] = useState<'dock' | 'undock' | null>(null);
 
-  const setDropTargetClass = (active: boolean) => {
-    findTabbar()?.classList.toggle('is-fab-drop-target', active);
-  };
-
   const playAnimation = (kind: 'dock' | 'undock') => {
-    const nav = findTabbar();
-    nav?.classList.remove('is-fab-docking', 'is-fab-undocking');
-    nav?.classList.add(kind === 'dock' ? 'is-fab-docking' : 'is-fab-undocking');
     setAnimation(kind);
     if (animationTimerRef.current !== null) window.clearTimeout(animationTimerRef.current);
-    animationTimerRef.current = window.setTimeout(() => {
-      nav?.classList.remove('is-fab-docking', 'is-fab-undocking');
-      setAnimation(null);
-    }, 360);
+    animationTimerRef.current = window.setTimeout(() => setAnimation(null), 360);
   };
 
   useLayoutEffect(() => {
@@ -91,8 +81,6 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
 
   useEffect(() => {
     return () => {
-      setDropTargetClass(false);
-      findTabbar()?.classList.remove('is-fab-docking', 'is-fab-undocking');
       if (animationTimerRef.current !== null) window.clearTimeout(animationTimerRef.current);
     };
   }, []);
@@ -142,23 +130,10 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
 
     event.preventDefault();
     if (event.cancelable) event.preventDefault();
-    const nav = findTabbar();
-    const navRect = nav?.getBoundingClientRect();
-    const next = {
-      left: clamp(event.clientX - FLOAT_SIZE / 2, 8, window.innerWidth - FLOAT_SIZE - 8),
-      top: clamp(event.clientY - FLOAT_SIZE / 2, 8, window.innerHeight - FLOAT_SIZE - 8),
-    };
-    setPosition(next);
-
-    const shouldHighlight =
-      !!navRect &&
-      event.clientX >= navRect.left - 16 &&
-      event.clientX <= navRect.right + 16 &&
-      event.clientY >= navRect.top - 28;
-    if (shouldHighlight !== dropTarget) {
-      setDropTarget(shouldHighlight);
-      setDropTargetClass(shouldHighlight);
-    }
+    setPosition({
+      left: clamp(event.clientX - SIZE / 2, 8, window.innerWidth - SIZE - 8),
+      top: clamp(event.clientY - SIZE / 2, 8, window.innerHeight - SIZE - 8),
+    });
   };
 
   const finishDrag = (event: ReactPointerEvent<HTMLButtonElement>, canceled: boolean) => {
@@ -189,13 +164,11 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
       setPosition((current) => {
         if (!current) return current;
         return {
-          left: clamp(current.left, 8, window.innerWidth - FLOAT_SIZE - 8),
-          top: clamp(current.top, 8, window.innerHeight - FLOAT_SIZE - 8),
+          left: clamp(current.left, 8, window.innerWidth - SIZE - 8),
+          top: clamp(current.top, 8, window.innerHeight - SIZE - 8),
         };
       });
     }
-    setDropTarget(false);
-    setDropTargetClass(false);
     window.setTimeout(() => {
       suppressClickRef.current = false;
     }, 80);
@@ -206,56 +179,44 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
     onAdd();
   };
 
-  const size = docked ? DOCK_SIZE : FLOAT_SIZE;
   const nav = findTabbar();
   const navRect = nav?.getBoundingClientRect();
-  const showMembrane = Boolean(position && navRect && (dropTarget || animation));
+  const neck =
+    navRect && (docked || animation)
+      ? {
+          left: navRect.right - DOCK_FROM_RIGHT - NECK_WIDTH / 2,
+          top: navRect.top - NECK_HEIGHT + 2,
+        }
+      : null;
 
   return (
     <>
-      <svg className="quick-add__filter-defs" aria-hidden="true" focusable="false">
-        <defs>
-          <filter id="quick-add-goo" x="-20%" y="-20%" width="140%" height="140%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
-            <feColorMatrix
-              in="blur"
-              mode="matrix"
-              values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 18 -7"
-              result="goo"
-            />
-          </filter>
-        </defs>
-      </svg>
-      {showMembrane && position && navRect ? (
-        <div className="quick-add__goo" aria-hidden="true">
-          <span
-            className="quick-add__goo-nav"
-            style={{
-              left: navRect.left,
-              top: navRect.top,
-              width: navRect.width,
-              height: navRect.height,
-            }}
+      {neck ? (
+        <svg
+          className={`quick-add__neck${animation ? ` is-${animation}ing` : ''}`}
+          style={{ left: neck.left, top: neck.top }}
+          width={NECK_WIDTH}
+          height={NECK_HEIGHT}
+          viewBox={`0 0 ${NECK_WIDTH} ${NECK_HEIGHT}`}
+          aria-hidden="true"
+        >
+          <path
+            className="quick-add__neck-fill"
+            d="M4 40 C 18 40 16 27 30 18 C 38 12 45 9 52 9 C 59 9 66 12 74 18 C 88 27 86 40 100 40 Z"
           />
-          <span
-            className="quick-add__goo-fab"
-            style={{
-              left: position.left - 16,
-              top: position.top - 16,
-              width: size + 32,
-              height: size + 32,
-              borderRadius: docked ? 30 : '50%',
-            }}
+          <path
+            className="quick-add__neck-line"
+            d="M4 40 C 18 40 16 27 30 18 C 38 12 45 9 52 9 C 59 9 66 12 74 18 C 88 27 86 40 100 40"
           />
-        </div>
+        </svg>
       ) : null}
       <button
         ref={buttonRef}
         type="button"
         className={`quick-add${docked ? ' is-docked' : ''}${dragging ? ' is-dragging' : ''}${
-          dropTarget ? ' is-near-dock' : ''
-        }${animation ? ` is-${animation}ing` : ''}`}
-        style={position ? { left: position.left, top: position.top, width: size, height: size } : undefined}
+          animation ? ` is-${animation}ing` : ''
+        }`}
+        style={position ? { left: position.left, top: position.top, width: SIZE, height: SIZE } : undefined}
         aria-label="记一笔，按住可拖动，拖到底部导航栏可入栏"
         title="记一笔 · 按住拖动"
         onClick={handleClick}
@@ -264,7 +225,7 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
         onPointerUp={(event) => finishDrag(event, false)}
         onPointerCancel={(event) => finishDrag(event, true)}
       >
-        <Icon name="plus" size={docked ? 21 : 23} strokeWidth={2.1} />
+        <Icon name="plus" size={23} strokeWidth={2.1} />
       </button>
     </>
   );
