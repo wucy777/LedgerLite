@@ -33,6 +33,8 @@ async function dispatch(request: RpcRequest): Promise<unknown> {
       return engine.listMonth(request.params);
     case 'getStats':
       return engine.getStats(request.params.ledgerId, request.params.month);
+    case 'getLedgerOverview':
+      return engine.getLedgerOverview(request.params.ledgerId);
     case 'saveEntry':
       return engine.saveEntry(request.params);
     case 'deleteEntry':

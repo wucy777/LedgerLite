@@ -14,6 +14,7 @@ export interface StatsPageProps {
   ledgerId: string;
   month: string;
   revision: number;
+  catalog: Catalog;
   onMonthChange: (month: string) => void;
 }
 

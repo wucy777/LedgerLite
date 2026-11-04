@@ -1,6 +1,7 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { Entry, EntryFilter } from '@shared/types';
 import { localDateKey, parseMonthKey } from '@shared/date';
+import { compareEntryRecency } from '@shared/entry-order';
 import { formatMoney } from '@shared/money';
 import { getLedgerClient } from '../api/client';
 import { Icon } from '../components/Icon';
@@ -110,7 +111,9 @@ export function LedgerPage({ ledgerId, month, revision, catalog, onMonthChange, 
       if (entry.type === 'expense') bucket.expenseCents += entry.amountCents;
       else bucket.incomeCents += entry.amountCents;
     }
-    return [...buckets.values()].sort((a, b) => b.date.localeCompare(a.date));
+    const ordered = [...buckets.values()].sort((a, b) => a.date.localeCompare(b.date));
+    for (const bucket of ordered) bucket.entries.sort(compareEntryRecency);
+    return ordered;
   }, [filteredEntries]);
 
   const categoryGroups = useMemo<LedgerCategoryGroupData[]>(() => {

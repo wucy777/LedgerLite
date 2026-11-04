@@ -311,6 +311,7 @@ function AppController() {
           ledgerId={activeLedger.id}
           month={month}
           revision={revision}
+          catalog={catalog}
           onMonthChange={setMonth}
         />
       );

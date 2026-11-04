@@ -131,6 +131,19 @@ export interface MonthStats {
   incomeCategories: CategoryTotal[];
 }
 
+/** All-time totals plus every entry in a ledger, newest occurrence first. */
+export interface LedgerOverview {
+  ledgerId: string;
+  entries: Entry[];
+  expenseCents: number;
+  incomeCents: number;
+  /** Gross sum: income + expense. */
+  totalCents: number;
+  /** Net: income - expense. */
+  netCents: number;
+  entryCount: number;
+}
+
 export interface CryptoState {
   enabled: boolean;
   unlocked: boolean;
@@ -271,6 +284,7 @@ export interface StorageApi {
   deleteLedger: { params: { id: string }; result: { ledgers: Ledger[] } };
   listMonth: { params: MonthQuery; result: MonthResult };
   getStats: { params: { ledgerId: string; month: string }; result: MonthStats };
+  getLedgerOverview: { params: { ledgerId: string }; result: LedgerOverview };
   saveEntry: { params: SaveEntryInput; result: Entry };
   deleteEntry: { params: { ledgerId: string; id: string }; result: void };
   addCategory: { params: { ledgerId: string; category: CategoryInput }; result: Catalog };

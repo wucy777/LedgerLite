@@ -4,6 +4,7 @@ import {
   LEDGER_COLORS,
 } from '../shared/defaults';
 import { daysInMonth, localDateKey, monthKeyOfIso } from '../shared/date';
+import { compareEntryRecency } from '../shared/entry-order';
 import { MAX_AMOUNT_CENTS } from '../shared/money';
 import {
   APP_VERSION,
@@ -27,6 +28,7 @@ import {
   type InitResult,
   type Ledger,
   type LedgerData,
+  type LedgerOverview,
   type MonthQuery,
   type MonthResult,
   type MonthStats,
@@ -151,12 +153,6 @@ function summarize(entries: readonly Entry[], month: string): MonthSummary {
     balanceCents: incomeCents - expenseCents,
     entryCount: entries.length,
   };
-}
-
-function compareEntriesDesc(a: Entry, b: Entry): number {
-  const occurred = Date.parse(b.occurredAt) - Date.parse(a.occurredAt);
-  if (occurred !== 0) return occurred;
-  return Date.parse(b.createdAt) - Date.parse(a.createdAt);
 }
 
 function nextSort(items: readonly { sort: number }[]): number {
@@ -614,12 +610,35 @@ export class LedgerEngine {
           (accountNames.get(entry.accountId) ?? '').toLowerCase().includes(needle)
         );
       })
-      .sort(compareEntriesDesc);
+      .sort(compareEntryRecency);
     return {
       ledgerId: ledger.id,
       month: query.month,
       entries,
       summary: summarize(entries, query.month),
+    };
+  }
+
+  async getLedgerOverview(ledgerId: string): Promise<LedgerOverview> {
+    await this.ensureReady();
+    const ledger = this.requireLedger(ledgerId);
+    const entries = (await this.loadEntries(ledger.id))
+      .map(({ entry }) => entry)
+      .sort(compareEntryRecency);
+    let expenseCents = 0;
+    let incomeCents = 0;
+    for (const entry of entries) {
+      if (entry.type === 'expense') expenseCents += entry.amountCents;
+      else incomeCents += entry.amountCents;
+    }
+    return {
+      ledgerId: ledger.id,
+      entries,
+      expenseCents,
+      incomeCents,
+      totalCents: expenseCents + incomeCents,
+      netCents: incomeCents - expenseCents,
+      entryCount: entries.length,
     };
   }
 

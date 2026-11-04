@@ -135,6 +135,52 @@ describe('LedgerEngine 基础', () => {
     expect((await engine.listMonth({ ledgerId: LEDGER, month: '2026-03', type: 'expense' })).entries).toHaveLength(3);
   });
 
+  it('getLedgerOverview 汇总全部月份并按发生时间倒序，同分钟按创建时间排序', async () => {
+    let clock = new Date('2026-03-01T08:00:00.000Z');
+    const engine = await setupEngine({
+      now: () => {
+        const value = new Date(clock);
+        clock = new Date(clock.getTime() + 1000);
+        return value;
+      },
+    });
+    const sameMinuteEarly = await engine.saveEntry({
+      ledgerId: LEDGER,
+      draft: expenseDraft({
+        amountCents: 1000,
+        occurredAt: new Date(2026, 2, 3, 9, 15, 45).toISOString(),
+      }),
+    });
+    const sameMinuteLate = await engine.saveEntry({
+      ledgerId: LEDGER,
+      draft: expenseDraft({
+        amountCents: 2000,
+        occurredAt: new Date(2026, 2, 3, 9, 15, 0).toISOString(),
+      }),
+    });
+    const laterMonth = await engine.saveEntry({
+      ledgerId: LEDGER,
+      draft: expenseDraft({ amountCents: 300, occurredAt: localIso(2026, 4, 1, 10) }),
+    });
+    const income = await engine.saveEntry({
+      ledgerId: LEDGER,
+      draft: incomeDraft({ amountCents: 50_000, occurredAt: localIso(2026, 2, 1, 8) }),
+    });
+
+    const overview = await engine.getLedgerOverview(LEDGER);
+    expect(overview.entryCount).toBe(4);
+    expect(overview.entries.map((entry) => entry.id)).toEqual([
+      laterMonth.id,
+      sameMinuteLate.id,
+      sameMinuteEarly.id,
+      income.id,
+    ]);
+    expect(overview.expenseCents).toBe(3300);
+    expect(overview.incomeCents).toBe(50_000);
+    expect(overview.totalCents).toBe(53_300);
+    expect(overview.netCents).toBe(46_700);
+  });
+
   it('getStats 覆盖当月每一天并计算分类占比、活跃天数、日均与峰值日', async () => {
     const engine = await setupEngine();
     const empty = await engine.getStats(LEDGER, '2026-03');
