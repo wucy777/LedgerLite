@@ -53,6 +53,7 @@ export function SettingsPage({
   onCatalogChange,
   onSessionChange,
   onDataChanged,
+  onLedgerImported,
   onLock,
 }: SettingsPageProps) {
   return (
@@ -73,9 +74,9 @@ export function SettingsPage({
         <DataSection
           ledgerId={ledgerId}
           encrypted={crypto.enabled}
-          onCatalogChange={onCatalogChange}
           onSessionChange={onSessionChange}
           onDataChanged={onDataChanged}
+          onLedgerImported={onLedgerImported}
         />
         <CatalogSection
           ledgerId={ledgerId}

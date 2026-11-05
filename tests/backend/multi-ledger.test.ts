@@ -119,6 +119,27 @@ describe('多账本', () => {
     expect(month.entries[0]?.note).toBe('副账本秘密');
   });
 
+  it('导入到新账本时保留原账本，并为条目生成新 ID', async () => {
+    const { engine } = await setup();
+    const original = await saveExpense(engine, DEFAULT_LEDGER_ID, { note: '默认保留', amountCents: 1200 });
+    const backup = await engine.exportBackup(DEFAULT_LEDGER_ID);
+
+    const result = await engine.importBackupAsLedger(backup, '导入副本');
+    expect(result.ledger.name).toBe('导入副本');
+    expect(result.ledgers).toHaveLength(2);
+    expect(result.entryCount).toBe(1);
+    expect(result.latestMonth).toBe('2026-03');
+
+    const originalMonth = await engine.listMonth({ ledgerId: DEFAULT_LEDGER_ID, month: '2026-03' });
+    expect(originalMonth.entries).toHaveLength(1);
+    expect(originalMonth.entries[0]?.id).toBe(original.id);
+
+    const importedMonth = await engine.listMonth({ ledgerId: result.ledger.id, month: '2026-03' });
+    expect(importedMonth.entries).toHaveLength(1);
+    expect(importedMonth.entries[0]?.note).toBe('默认保留');
+    expect(importedMonth.entries[0]?.id).not.toBe(original.id);
+  });
+
   it('备份只替换指定账本，不影响其他账本', async () => {
     const { engine } = await setup();
     const target = await engine.createLedger('目标');

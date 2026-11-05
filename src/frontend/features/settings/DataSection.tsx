@@ -7,7 +7,7 @@ import {
   type FormEvent,
   type ReactNode,
 } from 'react';
-import type { Catalog, InitResult } from '@shared/types';
+import type { ImportLedgerResult, InitResult } from '@shared/types';
 import { getLedgerClient } from '../../api/client';
 import { Icon, type UIIconName } from '../../components/Icon';
 import { useToast } from '../../components/ToastProvider';
@@ -28,9 +28,9 @@ import { friendlyError } from './errors';
 interface DataSectionProps {
   ledgerId: string;
   encrypted: boolean;
-  onCatalogChange: (catalog: Catalog) => void;
   onSessionChange: (session: InitResult) => void;
   onDataChanged: () => void;
+  onLedgerImported: (result: ImportLedgerResult) => void;
 }
 
 interface StorageUsage {
@@ -65,7 +65,13 @@ function DataRow({ icon, title, description, busy, disabled, onClick, trail }: D
   );
 }
 
-export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionChange, onDataChanged }: DataSectionProps) {
+export function DataSection({
+  ledgerId,
+  encrypted,
+  onSessionChange,
+  onDataChanged,
+  onLedgerImported,
+}: DataSectionProps) {
   const client = useMemo(() => getLedgerClient(), []);
   const { showToast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -180,16 +186,15 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
     setImportError('');
     try {
       const result = importPreview.encrypted
-        ? await client.call('importEncryptedBackup', {
-            ledgerId,
+        ? await client.call('importEncryptedBackupAsLedger', {
             passphrase: importPassphrase,
             backup: importPreview.backup,
           })
-        : await client.call('importBackup', { ledgerId, backup: importPreview.backup });
-      onCatalogChange(result.catalog);
+        : await client.call('importBackupAsLedger', { backup: importPreview.backup });
+      onLedgerImported(result);
       onDataChanged();
       setStorageTick((value) => value + 1);
-      showToast(`已导入 ${result.entryCount} 条记录`, 'success');
+      showToast(`已导入到新账本「${result.ledger.name}」，共 ${result.entryCount} 条记录`, 'success');
       closeImportDialog();
     } catch (reason) {
       setImportError(friendlyError(reason, '导入失败，请检查备份文件'));
@@ -258,7 +263,7 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
           <DataRow
             icon="upload"
             title="导入 JSON 备份"
-            description="支持加密备份与旧版明文备份"
+            description="导入后创建新账本，支持加密与旧版备份"
             disabled={importing || exporting !== null}
             onClick={() => fileInputRef.current?.click()}
           />
@@ -318,7 +323,7 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
       {importPreview ? (
         <Dialog
           title="导入备份"
-          eyebrow="将覆盖当前账本"
+          eyebrow="新建账本并导入"
           icon="upload"
           size="md"
           dismissOnBackdrop={!importing}
@@ -346,7 +351,7 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
                     正在导入
                   </>
                 ) : (
-                  '导入并覆盖'
+                  '导入到新账本'
                 )}
               </button>
             </>
@@ -407,7 +412,7 @@ export function DataSection({ ledgerId, encrypted, onCatalogChange, onSessionCha
           ) : null}
           <div className="settings-warning">
             <Icon name="alert" size={16} />
-            <p>导入会替换当前账本的全部记录、分类与账户，且无法撤销。其他账本不受影响；建议先导出当前账本备份。</p>
+            <p>导入会新建一个账本保存备份中的记录、分类与账户，现有账本不会被修改。导入完成后会自动切换到新账本。</p>
           </div>
           {importError ? (
             <p className="settings-field__error" role="alert">

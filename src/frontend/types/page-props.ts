@@ -1,4 +1,4 @@
-import type { Catalog, CryptoState, Entry, InitResult } from '@shared/types';
+import type { Catalog, CryptoState, Entry, ImportLedgerResult, InitResult } from '@shared/types';
 
 export interface LedgerPageProps {
   ledgerId: string;
@@ -26,6 +26,7 @@ export interface SettingsPageProps {
   onCatalogChange: (catalog: Catalog) => void;
   onSessionChange: (session: InitResult) => void;
   onDataChanged: () => void;
+  onLedgerImported: (result: ImportLedgerResult) => void;
   onLock: () => Promise<void>;
 }
 

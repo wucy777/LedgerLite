@@ -29,6 +29,7 @@ import {
   type Ledger,
   type LedgerData,
   type LedgerOverview,
+  type ImportLedgerResult,
   type MonthQuery,
   type MonthResult,
   type MonthStats,
@@ -536,16 +537,21 @@ export class LedgerEngine {
     await this.ensureReady();
     const cleanName = normalizeLedgerName(name);
     await this.ensureLedgerList();
+    const ledger = await this.insertLedger(cleanName, createDefaultCatalog());
+    return { ...this.currentInitResult(), ledger: cloneLedger(ledger), catalog: cloneCatalog(this.catalogs.get(ledger.id) ?? createDefaultCatalog()) };
+  }
+
+  /** Creates the ledger row + catalog and makes it active. Shared by manual creation and imports. */
+  private async insertLedger(name: string, catalog: Catalog): Promise<Ledger> {
     const timestamp = this.now().toISOString();
     const ledger: Ledger = {
       id: `ledger_${this.generateId()}`,
-      name: cleanName,
+      name,
       color: LEDGER_COLORS[this.ledgers.length % LEDGER_COLORS.length] ?? LEDGER_COLORS[0],
       createdAt: timestamp,
       updatedAt: timestamp,
       sort: nextSort(this.ledgers),
     };
-    const catalog = createDefaultCatalog();
     const record = await this.encodeCatalog(ledger.id, catalog, this.enabled ? this.requireKeys() : null);
     await this.database.run([LEDGER_STORE, KV_STORE], 'readwrite', async (tx) => {
       await tx.put(LEDGER_STORE, ledger);
@@ -554,7 +560,7 @@ export class LedgerEngine {
     this.ledgers = sortLedgers([...this.ledgers, ledger]);
     this.catalogs.set(ledger.id, catalog);
     this.activeLedgerId = ledger.id;
-    return { ...this.currentInitResult(), ledger: cloneLedger(ledger), catalog: cloneCatalog(catalog) };
+    return ledger;
   }
 
   async updateLedger(id: string, name: string): Promise<Ledger> {
@@ -888,6 +894,37 @@ export class LedgerEngine {
   ): Promise<ImportResult> {
     await this.ensureReady();
     this.requireLedger(ledgerId);
+    return this.importBackup(ledgerId, await this.decryptBackup(passphrase, backup));
+  }
+
+  async importBackup(ledgerId: string, backup: unknown): Promise<ImportResult> {
+    await this.ensureReady();
+    const ledger = this.requireLedger(ledgerId);
+    return this.writeBackup(ledger.id, parseBackup(backup));
+  }
+
+  /**
+   * Imports a backup into a brand new ledger. The current ledger is never
+   * touched; the returned ledger becomes active. This is the default import
+   * behavior in the UI.
+   */
+  async importBackupAsLedger(backup: unknown, ledgerName?: string): Promise<ImportLedgerResult> {
+    await this.ensureReady();
+    const payload = parseBackup(backup);
+    return this.createLedgerFromBackup(payload, ledgerName);
+  }
+
+  async importEncryptedBackupAsLedger(
+    passphrase: string,
+    backup: unknown,
+    ledgerName?: string,
+  ): Promise<ImportLedgerResult> {
+    await this.ensureReady();
+    const payload = parseBackup(await this.decryptBackup(passphrase, backup));
+    return this.createLedgerFromBackup(payload, ledgerName);
+  }
+
+  private async decryptBackup(passphrase: string, backup: unknown): Promise<BackupPayload> {
     const envelope = parseEncryptedBackup(backup);
     const salt = base64ToBytes(envelope.kdf.salt);
     const keys = await deriveKeys(assertPassphrase(passphrase), salt);
@@ -898,7 +935,7 @@ export class LedgerEngine {
     if (!(await verifyVerifier(keys, verifier))) {
       throw new LedgerError('INVALID_PASSPHRASE', '口令错误或备份已损坏');
     }
-    const payload = await decryptJson<BackupPayload>(
+    return decryptJson<BackupPayload>(
       keys,
       {
         iv: base64ToBytes(envelope.cipher.iv),
@@ -906,27 +943,53 @@ export class LedgerEngine {
       },
       ENCRYPTED_BACKUP_AAD,
     );
-    return this.importBackup(ledgerId, payload);
   }
 
-  async importBackup(ledgerId: string, backup: unknown): Promise<ImportResult> {
-    await this.ensureReady();
-    const ledger = this.requireLedger(ledgerId);
-    const payload = parseBackup(backup);
+  private async createLedgerFromBackup(
+    payload: BackupPayload,
+    requestedName?: string,
+  ): Promise<ImportLedgerResult> {
+    const fallbackName = payload.ledgerName
+      ? `导入自 ${payload.ledgerName}`
+      : `导入账本 ${this.now().toISOString().slice(5, 10)}`;
+    const requested = (requestedName ?? fallbackName).trim() || fallbackName;
+    const name = normalizeLedgerName(Array.from(requested).slice(0, LEDGER_NAME_MAX_LENGTH).join(''));
+    const ledger = await this.insertLedger(name, payload.catalog);
+    // Entry IDs are global primary keys, so a backup imported into another
+    // ledger must receive fresh IDs instead of overwriting existing records.
+    const importedPayload: BackupPayload = {
+      ...payload,
+      entries: payload.entries.map((entry) => ({ ...entry, id: this.generateId() })),
+    };
+    const result = await this.writeBackup(ledger.id, importedPayload);
+    let latestMonth: string | null = null;
+    for (const entry of payload.entries) {
+      const month = monthKeyOfIso(entry.occurredAt);
+      if (latestMonth === null || month > latestMonth) latestMonth = month;
+    }
+    return {
+      ...result,
+      ledger: cloneLedger(ledger),
+      ledgers: this.ledgers.map(cloneLedger),
+      latestMonth,
+    };
+  }
+
+  private async writeBackup(ledgerId: string, payload: BackupPayload): Promise<ImportResult> {
     const keys = this.enabled ? this.requireKeys() : null;
     const [catalogRecord, entryRecords] = await Promise.all([
-      this.encodeCatalog(ledger.id, payload.catalog, keys),
-      Promise.all(payload.entries.map((entry) => this.encodeEntry(ledger.id, entry, keys))),
+      this.encodeCatalog(ledgerId, payload.catalog, keys),
+      Promise.all(payload.entries.map((entry) => this.encodeEntry(ledgerId, entry, keys))),
     ]);
     await this.database.run([ENTRY_STORE, KV_STORE], 'readwrite', async (tx) => {
-      const keys = await tx.getAllKeysByIndex(ENTRY_STORE, LEDGER_INDEX, ledger.id);
-      await Promise.all(keys.map((key) => tx.delete(ENTRY_STORE, key)));
+      const existing = await tx.getAllKeysByIndex(ENTRY_STORE, LEDGER_INDEX, ledgerId);
+      await Promise.all(existing.map((key) => tx.delete(ENTRY_STORE, key)));
       await Promise.all([
         ...entryRecords.map((record) => tx.put(ENTRY_STORE, record)),
         tx.put(KV_STORE, catalogRecord),
       ]);
     });
-    this.catalogs.set(ledger.id, cloneCatalog(payload.catalog));
+    this.catalogs.set(ledgerId, cloneCatalog(payload.catalog));
     return {
       entryCount: payload.entries.length,
       categoryCount: payload.catalog.categories.length,

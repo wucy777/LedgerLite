@@ -255,6 +255,14 @@ export interface ImportResult {
   catalog: Catalog;
 }
 
+/** Result of importing a backup into a newly created ledger. */
+export interface ImportLedgerResult extends ImportResult {
+  ledger: Ledger;
+  ledgers: Ledger[];
+  /** Latest occurrence month in the imported data, used to open a useful page. */
+  latestMonth: string | null;
+}
+
 export type ErrorCode =
   | 'LOCKED'
   | 'INVALID_PASSPHRASE'
@@ -297,6 +305,14 @@ export interface StorageApi {
   importEncryptedBackup: {
     params: { ledgerId: string; passphrase: string; backup: unknown };
     result: ImportResult;
+  };
+  importBackupAsLedger: {
+    params: { backup: unknown; ledgerName?: string };
+    result: ImportLedgerResult;
+  };
+  importEncryptedBackupAsLedger: {
+    params: { passphrase: string; backup: unknown; ledgerName?: string };
+    result: ImportLedgerResult;
   };
   resetAll: { params: void; result: InitResult };
 }

@@ -78,6 +78,32 @@ describe('加密备份', () => {
     expect(month.entries[0]?.note).toBe('跨口令恢复');
   });
 
+  it('加密备份可导入为新账本并保留目标账本原记录', async () => {
+    const { engine: source } = await setup();
+    await saveExpense(source, DEFAULT_LEDGER_ID, { note: '新账本中的加密记录' });
+    await source.enableEncryption('source-pass-123');
+    const envelope = await source.exportEncryptedBackup(DEFAULT_LEDGER_ID);
+
+    const { engine: target } = await setup();
+    const kept = await saveExpense(target, DEFAULT_LEDGER_ID, { note: '目标原记录' });
+    await target.enableEncryption('target-pass-456');
+
+    const result = await target.importEncryptedBackupAsLedger(
+      'source-pass-123',
+      envelope,
+      '加密恢复账本',
+    );
+    expect(result.ledger.name).toBe('加密恢复账本');
+    expect(result.ledgers).toHaveLength(2);
+    expect(result.entryCount).toBe(1);
+
+    const keptMonth = await target.listMonth({ ledgerId: DEFAULT_LEDGER_ID, month: '2026-03' });
+    expect(keptMonth.entries.map((entry) => entry.id)).toEqual([kept.id]);
+    const imported = await target.listMonth({ ledgerId: result.ledger.id, month: '2026-03' });
+    expect(imported.entries[0]?.note).toBe('新账本中的加密记录');
+    expect(imported.entries[0]?.id).not.toBe(kept.id);
+  });
+
   it('未启用本地加密时拒绝导出加密备份', async () => {
     const { engine } = await setup();
     await expect(engine.exportEncryptedBackup(DEFAULT_LEDGER_ID)).rejects.toMatchObject({

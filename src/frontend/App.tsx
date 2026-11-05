@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import type { Catalog, Entry, InitResult, Ledger } from '@shared/types';
+import type { Catalog, Entry, ImportLedgerResult, InitResult, Ledger } from '@shared/types';
 import { currentMonthKey, monthKeyOfIso } from '@shared/date';
 import { getLedgerClient } from './api/client';
 import { BootScreen } from './components/BootScreen';
@@ -244,6 +244,21 @@ function AppController() {
     [client, showToast],
   );
 
+  const handleImportedLedger = useCallback((result: ImportLedgerResult) => {
+    setSession((current) =>
+      current ? { ...current, ledgers: result.ledgers, ledger: result.ledger, catalog: result.catalog } : current,
+    );
+    setLedgers(result.ledgers);
+    setActiveLedger(result.ledger);
+    setCatalog(result.catalog);
+    rememberActiveLedger(result.ledger.id);
+    setMonth(result.latestMonth ?? currentMonthKey());
+    setRevision((value) => value + 1);
+    setSheet(null);
+    setLedgerSheetOpen(false);
+    setTab('ledger');
+  }, []);
+
   const handleRenameLedger = useCallback(
     async (ledger: Ledger, name: string) => {
       const updated = await client.call('updateLedger', { id: ledger.id, name });
@@ -326,6 +341,7 @@ function AppController() {
         onCatalogChange={setCatalog}
         onSessionChange={handleSessionChange}
         onDataChanged={handleDataChanged}
+        onLedgerImported={handleImportedLedger}
         onLock={handleLock}
       />
     );

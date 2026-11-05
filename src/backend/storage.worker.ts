@@ -59,6 +59,14 @@ async function dispatch(request: RpcRequest): Promise<unknown> {
         request.params.passphrase,
         request.params.backup,
       );
+    case 'importBackupAsLedger':
+      return engine.importBackupAsLedger(request.params.backup, request.params.ledgerName);
+    case 'importEncryptedBackupAsLedger':
+      return engine.importEncryptedBackupAsLedger(
+        request.params.passphrase,
+        request.params.backup,
+        request.params.ledgerName,
+      );
     case 'resetAll':
       return engine.resetAll();
     default:
