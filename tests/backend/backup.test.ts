@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { LedgerEngine } from '../../src/backend/engine';
+import { createDefaultCatalog } from '../../src/shared/defaults';
 import type { BackupPayload, Entry } from '../../src/shared/types';
 import { DEFAULT_LEDGER_ID, createEngine, deleteDatabase, expenseDraft, incomeDraft, localIso, rawGet, rawGetAll, tickClock } from './helpers';
 
@@ -41,6 +42,48 @@ async function createSourceBackup(): Promise<BackupPayload> {
 }
 
 describe('备份导出与导入', () => {
+  it('兼容旧版 schema 1 的明文 JSON 备份（无 ledgerName）', async () => {
+    const { engine } = await setup();
+    const legacy = {
+      app: 'ledgerlite',
+      schema: 1,
+      version: '0.1.0-beta',
+      exportedAt: '2026-01-01T00:00:00.000Z',
+      entries: [
+        {
+          id: 'legacy_expense',
+          type: 'expense',
+          amountCents: 1234,
+          categoryId: 'cat_food',
+          accountId: 'acc_wechat',
+          note: '旧版备份午餐',
+          occurredAt: localIso(2025, 12, 31, 12),
+          createdAt: '2025-12-31T12:01:00.000Z',
+          updatedAt: '2025-12-31T12:01:00.000Z',
+        },
+        {
+          id: 'legacy_income',
+          type: 'income',
+          amountCents: 50_000,
+          categoryId: 'cat_salary',
+          accountId: 'acc_bank',
+          note: '',
+          occurredAt: localIso(2025, 12, 31, 9),
+          createdAt: '2025-12-31T09:01:00.000Z',
+          updatedAt: '2025-12-31T09:01:00.000Z',
+        },
+      ],
+      catalog: createDefaultCatalog(),
+    };
+
+    const result = await engine.importBackup(DEFAULT_LEDGER_ID, legacy);
+    expect(result).toMatchObject({ entryCount: 2, categoryCount: 15, accountCount: 5 });
+    const december = await engine.listMonth({ ledgerId: DEFAULT_LEDGER_ID, month: '2025-12' });
+    expect(december.entries.map((entry) => entry.id).sort()).toEqual(['legacy_expense', 'legacy_income']);
+    expect(december.summary).toMatchObject({ expenseCents: 1234, incomeCents: 50_000 });
+    expect((await engine.getStats(DEFAULT_LEDGER_ID, '2025-12')).expenseCategories[0]?.name).toBe('餐饮');
+  });
+
   it('导出备份包含明文记录、目录和元信息', async () => {
     const { engine } = await setup();
     await engine.saveEntry({ ledgerId: DEFAULT_LEDGER_ID, draft: expenseDraft({ note: '导出测试', occurredAt: localIso(2026, 3, 5) }) });
