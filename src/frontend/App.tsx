@@ -1,7 +1,10 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { App as CapacitorApp } from '@capacitor/app';
+import { Capacitor } from '@capacitor/core';
 import type { Catalog, Entry, ImportLedgerResult, InitResult, Ledger } from '@shared/types';
 import { currentMonthKey, monthKeyOfIso } from '@shared/date';
 import { getLedgerClient } from './api/client';
+import { BackPreview, type BackPreviewState } from './components/BackPreview';
 import { BootScreen } from './components/BootScreen';
 import { BrandMark } from './components/BrandMark';
 import { Icon } from './components/Icon';
@@ -10,6 +13,7 @@ import { PageSkeleton } from './components/PageSkeleton';
 import { QuickAddFab } from './components/QuickAddFab';
 import { ToastProvider, useToast } from './components/ToastProvider';
 import { LedgerSheet, LedgerTrigger } from './features/ledger/LedgerSwitcher';
+import { getTopBackHandler, runTopBackHandler } from './features/settings/overlay';
 import { LedgerPage } from './pages/LedgerPage';
 
 type TabId = 'ledger' | 'stats' | 'settings';
@@ -75,6 +79,92 @@ function AppController() {
   const [month, setMonth] = useState(() => currentMonthKey());
   const [revision, setRevision] = useState(0);
   const [sheet, setSheet] = useState<SheetState | null>(null);
+  const [backPreview, setBackPreview] = useState<BackPreviewState | null>(null);
+  const backPreviewTimer = useRef<number | null>(null);
+  const backActionTimer = useRef<number | null>(null);
+  const exitArmed = useRef(false);
+  const exitArmTimer = useRef<number | null>(null);
+
+  const showBackPreview = useCallback((label: string, duration = 1000) => {
+    if (backPreviewTimer.current !== null) window.clearTimeout(backPreviewTimer.current);
+    setBackPreview({ label, icon: 'chevron-left' });
+    backPreviewTimer.current = window.setTimeout(() => {
+      backPreviewTimer.current = null;
+      setBackPreview(null);
+    }, duration);
+  }, []);
+
+  const runBackAction = useCallback(
+    (label: string, action: () => void) => {
+      if (backActionTimer.current !== null) return;
+      showBackPreview(label);
+      backActionTimer.current = window.setTimeout(() => {
+        backActionTimer.current = null;
+        action();
+      }, 160);
+    },
+    [showBackPreview],
+  );
+
+  const handleSystemBack = useCallback(() => {
+    const topOverlay = getTopBackHandler();
+    if (topOverlay) {
+      runBackAction(topOverlay.label, () => {
+        runTopBackHandler();
+      });
+      return;
+    }
+    if (tab !== 'ledger') {
+      runBackAction('返回明细', () => setTab('ledger'));
+      return;
+    }
+    if (!exitArmed.current) {
+      exitArmed.current = true;
+      showBackPreview('再返回一次退出简账', 1800);
+      if (exitArmTimer.current !== null) window.clearTimeout(exitArmTimer.current);
+      exitArmTimer.current = window.setTimeout(() => {
+        exitArmTimer.current = null;
+        exitArmed.current = false;
+      }, 1800);
+      return;
+    }
+    exitArmed.current = false;
+    showBackPreview('正在退出简账', 600);
+    backActionTimer.current = window.setTimeout(() => {
+      backActionTimer.current = null;
+      if (Capacitor.isNativePlatform()) {
+        void CapacitorApp.exitApp();
+      } else {
+        window.history.back();
+      }
+    }, 120);
+  }, [runBackAction, showBackPreview, tab]);
+
+  useEffect(() => {
+    let removeListener: (() => Promise<void>) | null = null;
+    let cancelled = false;
+    void CapacitorApp.addListener('backButton', handleSystemBack)
+      .then((handle) => {
+        removeListener = () => handle.remove();
+        if (cancelled) void removeListener();
+      })
+      .catch(() => {
+        // The native App plugin is unavailable in a plain browser preview.
+      });
+    return () => {
+      cancelled = true;
+      void removeListener?.();
+    };
+  }, [handleSystemBack]);
+
+  useEffect(
+    () => () => {
+      if (backPreviewTimer.current !== null) window.clearTimeout(backPreviewTimer.current);
+      if (backActionTimer.current !== null) window.clearTimeout(backActionTimer.current);
+      if (exitArmTimer.current !== null) window.clearTimeout(exitArmTimer.current);
+    },
+    [],
+  );
 
   const applyLedgerSession = useCallback(
     async (result: InitResult, preferredLedgerId: string | null = readActiveLedgerId()) => {
@@ -479,6 +569,8 @@ function AppController() {
           />
         </Suspense>
       ) : null}
+
+      <BackPreview preview={backPreview} />
     </div>
   );
 }

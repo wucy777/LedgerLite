@@ -10,6 +10,7 @@ import {
 import { createPortal } from 'react-dom';
 import type { Ledger } from '@shared/types';
 import { Icon } from '../../components/Icon';
+import { useBackHandler } from '../settings/overlay';
 import '../../styles/ledger-switcher.css';
 
 export interface LedgerTriggerProps {
@@ -176,6 +177,7 @@ export function LedgerSheet({
     }
     requestClose();
   }, [requestClose]);
+  useBackHandler(handleDismiss, '关闭账本选择');
 
   useEffect(() => {
     const body = document.body;

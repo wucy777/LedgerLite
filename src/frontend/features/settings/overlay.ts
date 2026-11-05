@@ -1,7 +1,45 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 
 const overlayStack: symbol[] = [];
+const backHandlers: BackHandlerEntry[] = [];
 let bodyLockCount = 0;
+
+export interface BackHandlerEntry {
+  id: symbol;
+  label: string;
+  handler: () => void;
+}
+
+/** Registers the currently mounted layer in the app-wide back stack. */
+export function useBackHandler(handler: () => void, label = '返回'): void {
+  const handlerRef = useRef(handler);
+  handlerRef.current = handler;
+
+  useEffect(() => {
+    const entry: BackHandlerEntry = {
+      id: Symbol('back-handler'),
+      label,
+      handler: () => handlerRef.current(),
+    };
+    backHandlers.push(entry);
+    return () => {
+      const index = backHandlers.indexOf(entry);
+      if (index !== -1) backHandlers.splice(index, 1);
+    };
+  }, [label]);
+}
+
+export function getTopBackHandler(): BackHandlerEntry | null {
+  return backHandlers[backHandlers.length - 1] ?? null;
+}
+
+/** Runs the top handler. Returns false when the app itself should handle back. */
+export function runTopBackHandler(): boolean {
+  const top = getTopBackHandler();
+  if (!top) return false;
+  top.handler();
+  return true;
+}
 
 const FOCUSABLE_SELECTOR = [
   'a[href]',
@@ -29,6 +67,7 @@ export function useOverlayLayer(
 ): void {
   const dismissRef = useRef(onDismiss);
   dismissRef.current = onDismiss;
+  useBackHandler(() => dismissRef.current(), '关闭当前面板');
 
   useEffect(() => {
     const layerId = Symbol('settings-overlay');

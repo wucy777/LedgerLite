@@ -18,6 +18,7 @@ import { CategoryGlyph } from '../../components/CategoryGlyph';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/ToastProvider';
 import { activeAccounts, activeCategories, findAccount, findCategory } from '../../utils/catalog';
+import { useBackHandler } from '../settings/overlay';
 import type { EntrySheetProps } from '../../types/page-props';
 import '../../styles/entry-sheet.css';
 
@@ -161,6 +162,14 @@ export function EntrySheet({ ledgerId, entry, catalog, onClose, onSaved, onDelet
     [onClose],
   );
   dismissRef.current = dismiss;
+  useBackHandler(() => {
+    if (busyRef.current) return;
+    if (confirmingDeleteRef.current) {
+      setConfirmingDelete(false);
+      return;
+    }
+    dismissRef.current();
+  }, '关闭记账面板');
 
   useEffect(() => {
     const body = document.body;
