@@ -6,13 +6,25 @@ interface MonthSwitcherProps {
   onChange: (month: string) => void;
   tone?: 'default' | 'dark';
   align?: 'left' | 'center';
+  /** Reserves a fixed, compact width for dense headers such as statistics. */
+  compact?: boolean;
 }
 
-export function MonthSwitcher({ month, onChange, tone = 'default', align = 'left' }: MonthSwitcherProps) {
+export function MonthSwitcher({
+  month,
+  onChange,
+  tone = 'default',
+  align = 'left',
+  compact = false,
+}: MonthSwitcherProps) {
   const current = currentMonthKey();
   const isCurrent = month === current;
   return (
-    <div className={`month-switcher month-switcher--${tone} month-switcher--${align}`}>
+    <div
+      className={`month-switcher month-switcher--${tone} month-switcher--${align}${
+        compact ? ' month-switcher--compact' : ''
+      }`}
+    >
       <button
         type="button"
         className="month-switcher__arrow"

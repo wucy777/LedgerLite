@@ -30,7 +30,8 @@ export function StatsPage({ ledgerId, month, revision, catalog, onMonthChange }:
           <h1 className="stats-head__title">统计</h1>
         </div>
         <div className="stats-head__aside">
-          <div className="stats-view-switch" role="tablist" aria-label="统计范围">
+          <div className="stats-view-switch" data-view={view} role="tablist" aria-label="统计范围">
+            <span className="stats-view-switch__thumb" aria-hidden="true" />
             <button
               type="button"
               role="tab"
@@ -50,7 +51,11 @@ export function StatsPage({ ledgerId, month, revision, catalog, onMonthChange }:
               总统计
             </button>
           </div>
-          {view === 'month' ? <MonthSwitcher month={month} onChange={onMonthChange} /> : null}
+          {view === 'month' ? (
+            <div className="stats-month">
+              <MonthSwitcher month={month} onChange={onMonthChange} compact />
+            </div>
+          ) : null}
         </div>
       </header>
 

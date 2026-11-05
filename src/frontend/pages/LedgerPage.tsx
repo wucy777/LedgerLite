@@ -167,7 +167,7 @@ export function LedgerPage({ ledgerId, month, revision, catalog, onMonthChange, 
           <p className="ledger-head__eyebrow">{year} · MONTH LEDGER</p>
           <h1 className="ledger-head__title">明细</h1>
         </div>
-        <MonthSwitcher month={month} onChange={onMonthChange} />
+        <MonthSwitcher month={month} onChange={onMonthChange} compact />
       </header>
 
       {showInitialLoading ? <LedgerSkeleton /> : null}

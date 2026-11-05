@@ -91,7 +91,9 @@ export function LedgerOverviewView({ overview, catalog }: LedgerOverviewViewProp
           <span className="overview-hero__count">{overview.entryCount} 笔记录</span>
         </div>
         <p className="overview-hero__amount num">{formatMoney(overview.totalCents)}</p>
-        <p className="overview-hero__caption">总收入 + 总支出</p>
+        <p className="overview-hero__caption">
+          总收入 {formatMoney(overview.incomeCents)} · 总支出 {formatMoney(overview.expenseCents)}
+        </p>
         <dl className="overview-hero__grid">
           <div>
             <dt>总收入</dt>
@@ -104,10 +106,6 @@ export function LedgerOverviewView({ overview, catalog }: LedgerOverviewViewProp
           <div>
             <dt>收支合计</dt>
             <dd className="num">{formatMoney(overview.totalCents)}</dd>
-          </div>
-          <div className={overview.netCents < 0 ? 'is-negative' : undefined}>
-            <dt>结余</dt>
-            <dd className="num">{formatMoney(overview.netCents, { sign: 'always' })}</dd>
           </div>
         </dl>
       </section>
