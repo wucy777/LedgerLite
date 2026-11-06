@@ -11,63 +11,110 @@
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>简账 · 本地记账</title>
     <style>
+      :root {
+        color-scheme: light;
+        --splash-bg: #f3efe6;
+        --splash-ink: #22301f;
+        --splash-muted: #7b8477;
+        --splash-line: #ddd6c7;
+        --splash-accent: #2c4d39;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --splash-bg: #141814;
+          --splash-ink: #e6eee4;
+          --splash-muted: #8d9a8c;
+          --splash-line: #2d352c;
+          --splash-accent: #c0dac9;
+        }
+      }
       html,
       body {
         margin: 0;
         min-height: 100%;
-        background: #f3efe6;
+        background: var(--splash-bg);
       }
       body {
         -webkit-font-smoothing: antialiased;
+        font-family: "Avenir Next", "SF Pro Text", "Segoe UI", "HarmonyOS Sans SC",
+          "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
       }
       #root {
         min-height: 100dvh;
       }
+
+      /* The boot splash mirrors the React boot screen pixel for pixel so the
+         hand-off between the two never flashes. */
       .boot-splash {
+        position: relative;
         display: grid;
         min-height: 100dvh;
         place-items: center;
-        color: #2c4d39;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+        padding: 28px;
+        overflow: hidden;
+        color: var(--splash-ink);
+        background: var(--splash-bg);
       }
-      .boot-splash__mark {
+      .boot-splash::before {
+        position: absolute;
+        inset: 0;
+        background:
+          radial-gradient(ellipse 70% 42% at 18% 4%, rgba(194, 146, 80, 0.19), transparent 68%),
+          radial-gradient(ellipse 62% 52% at 92% 88%, rgba(74, 109, 84, 0.18), transparent 70%);
+        content: "";
+        pointer-events: none;
+      }
+      .boot-splash__center {
+        position: relative;
+        z-index: 1;
         display: flex;
         align-items: center;
         flex-direction: column;
-        gap: 14px;
-        font-size: 20px;
-        font-weight: 700;
-        letter-spacing: 0.16em;
       }
-      .boot-splash__dot {
-        width: 34px;
-        height: 34px;
-        border: 2px solid #d8d0c1;
-        border-top-color: #2c4d39;
-        border-radius: 50%;
-        animation: boot-spin 0.8s linear infinite;
+      .boot-splash__mark {
+        display: block;
+        filter: drop-shadow(0 24px 38px rgba(24, 44, 30, 0.28));
       }
-      @keyframes boot-spin {
+      .boot-splash__name {
+        margin-top: 22px;
+        font-size: 32px;
+        font-weight: 780;
+        letter-spacing: 0.1em;
+      }
+      .boot-splash__tagline {
+        margin-top: 5px;
+        color: var(--splash-muted);
+        font-size: 12px;
+        letter-spacing: 0.1em;
+      }
+      .boot-splash__loader {
+        width: 92px;
+        height: 2px;
+        margin-top: 28px;
+        overflow: hidden;
+        border-radius: 99px;
+        background: var(--splash-line);
+      }
+      .boot-splash__loader span {
+        display: block;
+        width: 38%;
+        height: 100%;
+        border-radius: inherit;
+        background: var(--splash-accent);
+        animation: boot-slide 1.2s cubic-bezier(0.4, 0.1, 0.3, 1) infinite;
+      }
+      @keyframes boot-slide {
+        from {
+          transform: translateX(-110%);
+        }
         to {
-          transform: rotate(360deg);
-        }
-      }
-      @media (prefers-color-scheme: dark) {
-        html,
-        body {
-          background: #141814;
-        }
-        .boot-splash {
-          color: #c0dac9;
-        }
-        .boot-splash__dot {
-          border-color: #354035;
-          border-top-color: #c0dac9;
+          transform: translateX(260%);
         }
       }
       @media (prefers-reduced-motion: reduce) {
-        .boot-splash__dot {
-          animation-duration: 1.6s;
+        .boot-splash__loader span {
+          animation-duration: 2.4s;
         }
       }
     </style>
@@ -75,9 +122,29 @@
   <body>
     <div id="root">
       <div class="boot-splash" role="status" aria-label="正在加载简账">
-        <div class="boot-splash__mark">
-          <div class="boot-splash__dot" aria-hidden="true"></div>
-          <span>简账</span>
+        <div class="boot-splash__center">
+          <svg
+            class="boot-splash__mark"
+            viewBox="0 0 48 48"
+            width="76"
+            height="76"
+            aria-hidden="true"
+            focusable="false"
+          >
+            <defs>
+              <linearGradient id="splash-mark" x1="8" y1="4" x2="41" y2="45" gradientUnits="userSpaceOnUse">
+                <stop stop-color="#2e513b" />
+                <stop offset="1" stop-color="#18271e" />
+              </linearGradient>
+            </defs>
+            <rect width="48" height="48" rx="14" fill="url(#splash-mark)" />
+            <path d="M14 16.5h20M14 23.5h12" stroke="#f4efe3" stroke-width="2.8" stroke-linecap="round" />
+            <path d="M14 31h8" stroke="#f4efe3" stroke-width="2.8" stroke-linecap="round" opacity=".55" />
+            <circle cx="31.5" cy="31" r="4.2" fill="#e58a6c" />
+          </svg>
+          <div class="boot-splash__name">简账</div>
+          <p class="boot-splash__tagline">每一笔，都有迹可循</p>
+          <div class="boot-splash__loader"><span></span></div>
         </div>
       </div>
     </div>

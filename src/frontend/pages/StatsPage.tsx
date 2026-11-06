@@ -39,7 +39,7 @@ export function StatsPage({ ledgerId, month, revision, catalog, onMonthChange }:
               className={view === 'month' ? 'is-active' : undefined}
               onClick={() => setView('month')}
             >
-              本月
+              月度
             </button>
             <button
               type="button"

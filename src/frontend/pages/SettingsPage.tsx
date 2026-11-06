@@ -2,6 +2,7 @@ import type { CryptoState } from '@shared/types';
 import { Icon } from '../components/Icon';
 import { CatalogSection } from '../features/settings/CatalogSection';
 import { DataSection } from '../features/settings/DataSection';
+import { DisplaySection } from '../features/settings/DisplaySection';
 import { EncryptionSection } from '../features/settings/EncryptionSection';
 import type { SettingsPageProps } from '../types/page-props';
 import '../styles/settings.css';
@@ -70,6 +71,7 @@ export function SettingsPage({
       </header>
 
       <div className="settings-layout">
+        <DisplaySection />
         <EncryptionSection crypto={crypto} onSessionChange={onSessionChange} onLock={onLock} />
         <DataSection
           ledgerId={ledgerId}

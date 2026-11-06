@@ -88,12 +88,14 @@
 
 .month-switcher__today {
   display: inline-flex;
+  min-height: 28px;
   align-items: center;
   justify-content: center;
   gap: 3px;
-  min-height: 28px;
-  padding: 4px 6px;
+  margin-right: 10px;
+  padding: 4px 8px;
   color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 16%, transparent);
   border-radius: var(--radius-pill);
   background: var(--accent-wash);
   font-size: 9px;

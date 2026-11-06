@@ -25,6 +25,18 @@ export function MonthSwitcher({
         compact ? ' month-switcher--compact' : ''
       }`}
     >
+      {isCurrent ? null : (
+        <button
+          type="button"
+          className="month-switcher__today"
+          aria-label="回到本月"
+          title="回到本月"
+          onClick={() => onChange(current)}
+        >
+          <Icon name="refresh" size={13} />
+          <span className="month-switcher__today-text">回本月</span>
+        </button>
+      )}
       <button
         type="button"
         className="month-switcher__arrow"
@@ -50,18 +62,6 @@ export function MonthSwitcher({
       >
         <Icon name="chevron-right" size={18} />
       </button>
-      {isCurrent ? null : (
-        <button
-          type="button"
-          className="month-switcher__today"
-          aria-label="回到本月"
-          title="回到本月"
-          onClick={() => onChange(current)}
-        >
-          <Icon name="refresh" size={13} />
-          <span className="month-switcher__today-text">回本月</span>
-        </button>
-      )}
     </div>
   );
 }

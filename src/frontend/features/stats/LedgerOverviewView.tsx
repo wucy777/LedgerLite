@@ -87,7 +87,7 @@ export function LedgerOverviewView({ overview, catalog }: LedgerOverviewViewProp
     <>
       <section className="overview-hero" aria-label="账本总统计">
         <div className="overview-hero__top">
-          <span className="overview-hero__label">账本总统计</span>
+          <span className="overview-hero__label">总流水</span>
           <span className="overview-hero__count">{overview.entryCount} 笔记录</span>
         </div>
         <p className="overview-hero__amount num">{formatMoney(overview.totalCents)}</p>
@@ -103,9 +103,9 @@ export function LedgerOverviewView({ overview, catalog }: LedgerOverviewViewProp
             <dt>总支出</dt>
             <dd className="num">{formatMoney(overview.expenseCents)}</dd>
           </div>
-          <div>
-            <dt>收支合计</dt>
-            <dd className="num">{formatMoney(overview.totalCents)}</dd>
+          <div className={overview.netCents < 0 ? 'is-negative' : undefined}>
+            <dt>结余</dt>
+            <dd className="num">{formatMoney(overview.netCents)}</dd>
           </div>
         </dl>
       </section>

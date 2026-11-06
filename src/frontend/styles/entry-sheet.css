@@ -481,21 +481,46 @@
   background: var(--accent-wash);
 }
 
-.entry-date__display {
-  margin-left: auto;
-  color: var(--muted);
-  font-size: 10.5px;
-  letter-spacing: 0.03em;
+.entry-date__open {
+  display: inline-flex;
+  min-height: 44px;
+  flex: 1 1 150px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 12px;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition:
+    color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    background-color var(--dur-fast) ease,
+    transform var(--dur-fast) var(--ease-out);
+}
+
+.entry-date__open svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.entry-date__open-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.entry-date__input {
-  color-scheme: inherit;
+.entry-date__open:hover {
+  border-color: color-mix(in srgb, var(--accent) 22%, var(--line));
+  background: var(--accent-wash);
 }
 
-.entry-date__input::-webkit-calendar-picker-indicator {
-  opacity: 0.55;
-  cursor: pointer;
+.entry-date__open:active {
+  transform: scale(0.98);
 }
 
 /* ---------------------------------------------------------------- delete */

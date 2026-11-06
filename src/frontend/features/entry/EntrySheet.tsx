@@ -6,10 +6,8 @@ import { DEFAULT_ACCOUNT_ID, DEFAULT_CATEGORY_ID } from '@shared/defaults';
 import {
   dateAtCurrentTime,
   dateKeyToLocalDate,
-  datetimeLocalValue,
   formatFullDate,
   formatTime,
-  fromDatetimeLocal,
   localDateKey,
 } from '@shared/date';
 import { applyAmountKey, formatMoney, parseAmountToCents } from '@shared/money';
@@ -20,6 +18,7 @@ import { useToast } from '../../components/ToastProvider';
 import { activeAccounts, activeCategories, findAccount, findCategory } from '../../utils/catalog';
 import { useBackHandler } from '../settings/overlay';
 import type { EntrySheetProps } from '../../types/page-props';
+import { DateTimePicker } from './DateTimePicker';
 import '../../styles/entry-sheet.css';
 
 const STORAGE_PREFIX = 'ledgerlite.ui.';
@@ -136,6 +135,7 @@ export function EntrySheet({ ledgerId, entry, catalog, onClose, onSaved, onDelet
   const [busy, setBusy] = useState<'save' | 'delete' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const categories = categoriesFor(catalog, type, entry);
   const accounts = accountsFor(catalog, entry);
@@ -576,22 +576,19 @@ export function EntrySheet({ ledgerId, entry, catalog, onClose, onSaved, onDelet
                 >
                   昨天
                 </button>
-                <span className="entry-date__display">
-                  {formatFullDate(activeDateKey)} · {formatTime(occurredAt)}
-                </span>
+                <button
+                  type="button"
+                  className="entry-date__open"
+                  aria-label={`选择日期与时间，当前 ${formatFullDate(activeDateKey)} ${formatTime(occurredAt)}`}
+                  onClick={() => setPickerOpen(true)}
+                >
+                  <Icon name="calendar" size={14} />
+                  <span className="entry-date__open-text">
+                    {formatFullDate(activeDateKey)} · {formatTime(occurredAt)}
+                  </span>
+                  <Icon name="chevron-right" size={14} />
+                </button>
               </div>
-              <input
-                className="entry-field__input entry-date__input"
-                type="datetime-local"
-                value={datetimeLocalValue(occurredAt)}
-                aria-label="选择日期与时间"
-                onChange={(event) => {
-                  const next = fromDatetimeLocal(event.target.value);
-                  if (!next) return;
-                  setOccurredAt(next);
-                  setError(null);
-                }}
-              />
             </section>
 
             {entry ? (
@@ -669,6 +666,18 @@ export function EntrySheet({ ledgerId, entry, catalog, onClose, onSaved, onDelet
           <p className="entry-sheet__hint">Enter 保存 · Esc 关闭</p>
         </footer>
       </div>
+
+      {pickerOpen ? (
+        <DateTimePicker
+          value={occurredAt}
+          onCancel={() => setPickerOpen(false)}
+          onConfirm={(next) => {
+            setOccurredAt(next);
+            setError(null);
+            setPickerOpen(false);
+          }}
+        />
+      ) : null}
     </div>,
     document.body,
   );

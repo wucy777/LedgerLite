@@ -1,4 +1,4 @@
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { Entry, EntryFilter } from '@shared/types';
 import { localDateKey, parseMonthKey } from '@shared/date';
 import { compareEntryRecency } from '@shared/entry-order';
@@ -239,7 +239,13 @@ export function LedgerPage({ ledgerId, month, revision, catalog, onMonthChange, 
             </div>
 
             <div className="ledger-filterbar">
-              <div className="ledger-filters" role="group" aria-label="按收支筛选">
+              <div
+                className="ledger-filters"
+                role="group"
+                aria-label="按收支筛选"
+                style={{ '--filter-index': FILTERS.findIndex((item) => item.id === filter) } as CSSProperties}
+              >
+                <span className="ledger-filters__thumb" aria-hidden="true" />
                 {FILTERS.map((item) => (
                   <button
                     key={item.id}

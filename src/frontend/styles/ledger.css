@@ -292,27 +292,41 @@
 }
 
 .ledger-filters {
+  position: relative;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 3px;
+  gap: 0;
   padding: 2px;
   border: 1px solid var(--line);
   border-radius: var(--radius-pill);
   background: var(--surface-muted);
+  isolation: isolate;
+}
+
+.ledger-filters__thumb {
+  position: absolute;
+  z-index: 0;
+  top: 2px;
+  bottom: 2px;
+  left: 2px;
+  width: calc((100% - 4px) / 3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-xs);
+  transform: translateX(calc(var(--filter-index, 0) * 100%));
+  transition: transform 260ms var(--ease-spring);
 }
 
 .ledger-filters__button {
+  position: relative;
+  z-index: 1;
   min-height: 44px;
   color: var(--muted);
   border-radius: var(--radius-pill);
   font-size: 12.5px;
   font-weight: 620;
   letter-spacing: 0.02em;
-  transition:
-    color var(--dur-fast) ease,
-    background-color var(--dur-fast) ease,
-    box-shadow var(--dur-fast) ease,
-    transform var(--dur-fast) var(--ease-out);
+  transition: color 160ms ease, transform var(--dur-fast) var(--ease-out);
 }
 
 .ledger-filters__button:hover {
@@ -325,8 +339,6 @@
 
 .ledger-filters__button.is-active {
   color: var(--ink);
-  background: var(--surface-raised);
-  box-shadow: var(--shadow-xs);
 }
 
 .ledger-results {

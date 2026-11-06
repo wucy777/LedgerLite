@@ -31,7 +31,8 @@ export type UIIconName =
   | 'wallet'
   | 'edit'
   | 'archive'
-  | 'sparkle';
+  | 'sparkle'
+  | 'zap';
 
 export type AnyIconName = UIIconName | IconName;
 
@@ -172,6 +173,7 @@ const GLYPHS: Record<AnyIconName, ReactNode> = {
       <path d="M19.5 16.5c.2 1.7 1.3 2.8 3 3-1.7.2-2.8 1.3-3 3-.2-1.7-1.3-2.8-3-3 1.7-.2 2.8-1.3 3-3Z" />
     </>
   ),
+  zap: <path d="M13 2 4.5 13.5H11l-1 8.5 8.5-11.5H12l1-8.5Z" />,
 
   food: (
     <>
