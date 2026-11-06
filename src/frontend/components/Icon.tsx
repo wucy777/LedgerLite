@@ -290,6 +290,12 @@ const GLYPHS: Record<AnyIconName, ReactNode> = {
       <path d="M3 10h18M6.5 15h3" />
     </>
   ),
+  ecny: (
+    <>
+      <circle cx="12" cy="12" r="8.6" />
+      <path d="M9.2 8.6v6.8M14.8 8.6v6.8M9.2 8.6l5.6 6.8M14.8 8.6 9.2 15.4" />
+    </>
+  ),
 };
 
 export interface IconProps extends Omit<SVGProps<SVGSVGElement>, 'name'> {

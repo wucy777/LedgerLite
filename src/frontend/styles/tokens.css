@@ -61,6 +61,22 @@
   --dur-base: 220ms;
   --dur-slow: 380ms;
 
+  /* Backdrop blur is the single most expensive effect here: it re-filters the
+     page behind every fixed bar on each scroll frame. Overridable per profile. */
+  --blur-bar: blur(22px) saturate(1.2);
+  --blur-pill: blur(12px);
+  --blur-sheet: blur(4px);
+  /* The floating bars are glassy only while a blur is actually applied. */
+  --bar-surface: color-mix(in srgb, var(--surface) 82%, transparent);
+  /* Duration of a dragged thumb/slider following an index change. */
+  --scrub-duration: 260ms;
+  --scrub-ease: var(--ease-spring);
+  /* Page-level slide when switching tabs. */
+  --slide-duration: 280ms;
+  --slide-distance: 28px;
+  /* Per-item delay for list reveals; capped by the consumer. */
+  --stagger: 40ms;
+
   --safe-top: max(env(safe-area-inset-top, 0px), 12px);
   --safe-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
 
@@ -68,12 +84,25 @@
   --content-width: 780px;
 }
 
-/* High refresh rate profile: shorter durations so a 120 Hz panel keeps motion
-   crisp instead of feeling sluggish. */
+/* High refresh rate profile: at 120 Hz a 220 ms fade spans 26 frames, so long
+   durations read as lag behind the finger. Shorten them, drop the overshoot on
+   sliders (tracking, not bouncing) and remove backdrop blur — a blurred fixed
+   bar re-filters the page on every scroll frame, which is what made scrolling
+   feel heavy even at a high refresh rate. */
 :root.is-high-refresh {
-  --dur-fast: 100ms;
-  --dur-base: 150ms;
-  --dur-slow: 240ms;
+  --dur-fast: 90ms;
+  --dur-base: 130ms;
+  --dur-slow: 210ms;
+  --ease-spring: cubic-bezier(0.2, 0.8, 0.3, 1);
+  --blur-bar: none;
+  --blur-pill: none;
+  --blur-sheet: none;
+  --bar-surface: var(--surface);
+  --scrub-duration: 120ms;
+  --scrub-ease: var(--ease-out);
+  --slide-duration: 170ms;
+  --slide-distance: 18px;
+  --stagger: 18ms;
 }
 
 @media (prefers-color-scheme: dark) {

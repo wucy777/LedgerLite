@@ -290,7 +290,7 @@ describe('v1 数据库迁移到 v2', () => {
     expect(init.ledgers).toHaveLength(1);
     expect(init.ledgers[0]?.id).toBe(DEFAULT_LEDGER_ID);
     expect(init.catalog?.categories).toHaveLength(15);
-    expect(init.catalog?.accounts).toHaveLength(5);
+    expect(init.catalog?.accounts).toHaveLength(6);
     expect(await rawGetAll<MigratedEntryRecord>(dbName, 'entries')).toHaveLength(0);
     const catalog = await rawGet<V1CatalogRecord>(dbName, 'kv', `catalog:${DEFAULT_LEDGER_ID}`);
     expect(catalog?.payload.encrypted).toBe(false);

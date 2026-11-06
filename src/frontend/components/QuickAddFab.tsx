@@ -20,6 +20,11 @@ interface DragState {
   startY: number;
   moved: boolean;
   wasDocked: boolean;
+  /** Where the button sat when the drag began, in viewport coordinates. */
+  originLeft: number;
+  originTop: number;
+  left: number;
+  top: number;
 }
 
 const FLOAT_SIZE = 56;
@@ -94,12 +99,17 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const button = buttonRef.current;
     if (!button) return;
+    const rect = button.getBoundingClientRect();
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
       startY: event.clientY,
       moved: false,
       wasDocked: docked,
+      originLeft: rect.left,
+      originTop: rect.top,
+      left: rect.left,
+      top: rect.top,
     };
     suppressClickRef.current = false;
     button.setPointerCapture(event.pointerId);
@@ -108,6 +118,8 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
   const handlePointerMove = (event: ReactPointerEvent<HTMLButtonElement>) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
+    const button = buttonRef.current;
+    if (!button) return;
     const dx = event.clientX - drag.startX;
     const dy = event.clientY - drag.startY;
     if (!drag.moved && Math.hypot(dx, dy) < 4) return;
@@ -120,11 +132,14 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
     }
 
     event.preventDefault();
-    if (event.cancelable) event.preventDefault();
-    setPosition({
-      left: clamp(event.clientX - FLOAT_SIZE / 2, 8, window.innerWidth - FLOAT_SIZE - 8),
-      top: clamp(event.clientY - FLOAT_SIZE / 2, 8, window.innerHeight - FLOAT_SIZE - 8),
-    });
+    // Written straight to the element: going through state would re-render the
+    // tree on every pointermove, which is exactly what makes a drag trail a
+    // 120 Hz finger.
+    const left = clamp(event.clientX - FLOAT_SIZE / 2, 8, window.innerWidth - FLOAT_SIZE - 8);
+    const top = clamp(event.clientY - FLOAT_SIZE / 2, 8, window.innerHeight - FLOAT_SIZE - 8);
+    drag.left = left;
+    drag.top = top;
+    button.style.transform = `translate3d(${left - drag.originLeft}px, ${top - drag.originTop}px, 0)`;
 
     const navRect = findTabbar()?.getBoundingClientRect();
     const shouldHighlight =
@@ -142,6 +157,10 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
     const drag = dragRef.current;
     if (!drag) return;
     dragRef.current = null;
+    const button = buttonRef.current;
+    // The drag moved the button with a transform; drop it before committing the
+    // final position so the element never jumps twice.
+    if (button) button.style.transform = '';
     if (!drag.moved) {
       setDragging(false);
       return;
@@ -162,12 +181,10 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
       onDockChange(true);
       setPosition(dockedPosition(nav));
     } else {
-      setPosition((current) => {
-        if (!current) return current;
-        return {
-          left: clamp(current.left, 8, window.innerWidth - FLOAT_SIZE - 8),
-          top: clamp(current.top, 8, window.innerHeight - FLOAT_SIZE - 8),
-        };
+      // `drag` holds the last painted position, so no state has to be read back.
+      setPosition({
+        left: clamp(drag.left, 8, window.innerWidth - FLOAT_SIZE - 8),
+        top: clamp(drag.top, 8, window.innerHeight - FLOAT_SIZE - 8),
       });
     }
     setDropTarget(false);

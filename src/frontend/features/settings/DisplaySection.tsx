@@ -20,8 +20,8 @@ export function DisplaySection() {
             <span className="settings-row__title">高刷新率</span>
             <span className="settings-row__desc">
               {supported
-                ? '优先使用屏幕最高刷新率，切换与滑动动画更跟手。'
-                : '当前环境无法切换刷新率，开关仅影响动画曲线。'}
+                ? '请求屏幕最高刷新率，并改用更短、无回弹的动效与更轻的毛玻璃，滑动更跟手。'
+                : '当前环境无法切换刷新率，开关仅缩短动画时长。'}
             </span>
           </div>
           <button

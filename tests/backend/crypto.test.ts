@@ -239,7 +239,7 @@ describe('加密生命周期', () => {
     expect(result.status).toBe('ready');
     expect(result.crypto).toEqual({ enabled: false, unlocked: false });
     expect(result.catalog?.categories).toHaveLength(15);
-    expect(result.catalog?.accounts).toHaveLength(5);
+    expect(result.catalog?.accounts).toHaveLength(6);
     expect(await rawGetAll(dbName, 'entries')).toHaveLength(0);
     expect(await rawGet(dbName, 'kv', 'crypto')).toBeUndefined();
     expect((await engine.listMonth({

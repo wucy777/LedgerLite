@@ -22,7 +22,7 @@ export const INCOME_ICONS: readonly IconName[] = [
   'other',
 ];
 
-export const ACCOUNT_ICONS: readonly IconName[] = ['wallet', 'wechat', 'alipay', 'bank', 'cash', 'card'];
+export const ACCOUNT_ICONS: readonly IconName[] = ['wallet', 'wechat', 'alipay', 'bank', 'cash', 'card', 'ecny'];
 
 export const CATEGORY_PALETTE: readonly string[] = CATEGORY_COLORS;
 
@@ -47,6 +47,7 @@ export const ICON_LABELS: Partial<Record<IconName, string>> = {
   bank: '银行卡',
   cash: '现金',
   card: '信用卡',
+  ecny: '数字人民币',
 };
 
 export const PALETTE_LABELS: Record<string, string> = {

@@ -314,7 +314,7 @@
   background: var(--surface-raised);
   box-shadow: var(--shadow-xs);
   transform: translateX(calc(var(--filter-index, 0) * 100%));
-  transition: transform 260ms var(--ease-spring);
+  transition: transform var(--scrub-duration) var(--scrub-ease);
 }
 
 .ledger-filters__button {
@@ -369,8 +369,10 @@
 .ledger-day {
   content-visibility: auto;
   contain-intrinsic-size: auto 320px;
-  animation: ledger-day-in 460ms var(--ease-out) both;
-  animation-delay: calc(var(--ledger-day-index, 0) * 45ms);
+  animation: ledger-day-in var(--dur-slow) var(--ease-out) both;
+  /* Cap the cascade: a 30-day month would otherwise start its last row almost
+     a second late, which reads as a stuck list rather than a reveal. */
+  animation-delay: calc(min(var(--ledger-day-index, 0), 5) * var(--stagger));
 }
 
 .ledger-day__head {
@@ -953,8 +955,8 @@
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-xs);
-  animation: ledger-day-in 440ms var(--ease-out) both;
-  animation-delay: calc(var(--group-index, 0) * 38ms);
+  animation: ledger-day-in var(--dur-slow) var(--ease-out) both;
+  animation-delay: calc(min(var(--group-index, 0), 5) * var(--stagger));
 }
 
 .ledger-group__head {

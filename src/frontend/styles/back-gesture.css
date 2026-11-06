@@ -1,5 +1,6 @@
 /* Predictive back: the destination screen sits behind the app surface, and the
-   whole app surface lifts away from the left edge as the finger drags. */
+   whole app surface lifts away from the left edge as the finger drags. Closing a
+   sheet instead previews that sheet leaving, with the page left in place. */
 
 .back-gesture {
   position: fixed;
@@ -87,7 +88,8 @@
   background: var(--gold);
 }
 
-/* The app surface becomes a card that lifts off the destination screen. */
+/* The app surface becomes a card that lifts off the destination screen. Only a
+   page-level back does this; closing a sheet leaves the page in place. */
 .app__body {
   position: relative;
   z-index: 2;
@@ -96,7 +98,7 @@
     border-radius 240ms var(--ease-out);
 }
 
-.app.is-back-gesturing .app__body {
+:root.is-page-preview .app__body {
   overflow: hidden;
   border-radius: 0 30px 30px 0;
   background: var(--bg);
@@ -107,8 +109,55 @@
   transition: none;
 }
 
+/* A layer being dismissed by the gesture. These panels animate in with `fill:
+   both`, which keeps ownership of `transform`; the gesture therefore drives the
+   independent `translate`/`scale` properties, which compose with that transform
+   instead of fighting it (and so never replay the entrance on a cancel). */
+.is-back-preview {
+  transition: none;
+  will-change: translate, scale;
+}
+
+/* The backdrop clears out with the gesture, so the page it hid comes back. */
+.entry-sheet.is-back-root .entry-sheet__scrim,
+.date-picker.is-back-root .date-picker__scrim {
+  opacity: calc(1 - var(--back-progress, 0) * 0.8);
+  transition: none;
+}
+
+/* These two double as their own backdrop, so the tint is faded rather than the
+   element: `opacity` would also wash out the panel inside it. */
+.settings-overlay.is-back-root,
+.ledger-picker-overlay.is-back-root {
+  backdrop-filter: none;
+  background: color-mix(in srgb, var(--hero-end) calc(54% - var(--back-progress, 0) * 54%), transparent);
+  transition: none;
+}
+
+/* Bottom sheets peel away downward… */
+.entry-sheet__panel.is-back-preview,
+.settings-sheet.is-back-preview,
+.ledger-picker-sheet.is-back-preview {
+  translate: 0 calc(var(--back-progress, 0) * 34%);
+  scale: calc(1 - var(--back-progress, 0) * 0.04);
+  transform-origin: 50% 100%;
+}
+
+/* …while centred panels follow the finger to the right. */
+.date-picker__panel.is-back-preview,
+.settings-dialog.is-back-preview {
+  translate: calc(var(--back-progress, 0) * 26%) 0;
+  scale: calc(1 - var(--back-progress, 0) * 0.06);
+  transform-origin: 0% 50%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .app__body {
     transition: none;
+  }
+
+  :root.is-page-preview .app__body,
+  .is-back-preview {
+    transform: none;
   }
 }

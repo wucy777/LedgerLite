@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 
 const overlayStack: symbol[] = [];
 const backHandlers: BackHandlerEntry[] = [];
@@ -8,29 +8,75 @@ export interface BackHandlerEntry {
   id: symbol;
   label: string;
   handler: () => void;
+  /** Panel element of a modal layer, used to preview its dismissal. */
+  getElement?: () => HTMLElement | null;
+}
+
+const backListeners = new Set<() => void>();
+let topSnapshot: BackHandlerEntry | null = null;
+
+function publishBackStack(): void {
+  const next = backHandlers[backHandlers.length - 1] ?? null;
+  if (next === topSnapshot) return;
+  topSnapshot = next;
+  for (const listener of backListeners) listener();
+}
+
+function subscribeBackStack(listener: () => void): () => void {
+  backListeners.add(listener);
+  return () => {
+    backListeners.delete(listener);
+  };
+}
+
+function readBackTop(): BackHandlerEntry | null {
+  return topSnapshot;
+}
+
+/**
+ * The layer that currently owns the back gesture, or null when back reaches the
+ * page. Lets the shell decide what a predictive-back preview should promise
+ * without re-rendering on every progress tick.
+ */
+export function useBackStackTop(): BackHandlerEntry | null {
+  return useSyncExternalStore(subscribeBackStack, readBackTop, readBackTop);
 }
 
 /** Registers the currently mounted layer in the app-wide back stack. */
-export function useBackHandler(handler: () => void, label = '返回'): void {
+export function useBackHandler(
+  handler: () => void,
+  label = '返回',
+  getElement?: () => HTMLElement | null,
+): void {
   const handlerRef = useRef(handler);
   handlerRef.current = handler;
+  const elementRef = useRef(getElement);
+  elementRef.current = getElement;
 
   useEffect(() => {
     const entry: BackHandlerEntry = {
       id: Symbol('back-handler'),
       label,
       handler: () => handlerRef.current(),
+      getElement: elementRef.current ? () => elementRef.current?.() ?? null : undefined,
     };
     backHandlers.push(entry);
+    publishBackStack();
     return () => {
       const index = backHandlers.indexOf(entry);
       if (index !== -1) backHandlers.splice(index, 1);
+      publishBackStack();
     };
   }, [label]);
 }
 
 export function getTopBackHandler(): BackHandlerEntry | null {
   return backHandlers[backHandlers.length - 1] ?? null;
+}
+
+/** Panel element of the layer that owns back, so a gesture can preview it. */
+export function getTopBackElement(): HTMLElement | null {
+  return backHandlers[backHandlers.length - 1]?.getElement?.() ?? null;
 }
 
 /** Runs the top handler. Returns false when the app itself should handle back. */
@@ -64,10 +110,12 @@ function focusableWithin(root: HTMLElement | null): HTMLElement[] {
 export function useOverlayLayer(
   containerRef: RefObject<HTMLElement | null>,
   onDismiss: () => void,
+  previewRef?: RefObject<HTMLElement | null>,
 ): void {
   const dismissRef = useRef(onDismiss);
   dismissRef.current = onDismiss;
-  useBackHandler(() => dismissRef.current(), '关闭当前面板');
+  const targetRef = previewRef ?? containerRef;
+  useBackHandler(() => dismissRef.current(), '关闭当前面板', () => targetRef.current);
 
   useEffect(() => {
     const layerId = Symbol('settings-overlay');

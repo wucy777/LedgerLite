@@ -49,7 +49,7 @@ describe('多账本 API 边界', () => {
     expect(travel.ledger.sort).toBe(1);
     expect(travel.ledgers.map((ledger) => ledger.name)).toEqual(['默认账本', '旅行']);
     expect(travel.catalog.categories).toHaveLength(15);
-    expect(travel.catalog.accounts).toHaveLength(5);
+    expect(travel.catalog.accounts).toHaveLength(6);
 
     const work = await engine.createLedger('工作');
     expect(work.ledger.color).toBe(LEDGER_COLORS[2]);
@@ -211,7 +211,7 @@ describe('多账本 API 边界', () => {
     const first = await engine.createLedger('导入一');
     await saveExpenseIn(engine, DEFAULT_LEDGER_ID, '保留默认记录');
     const firstResult = await engine.importBackup(first.ledger.id, schema1);
-    expect(firstResult).toMatchObject({ entryCount: 1, categoryCount: 15, accountCount: 5 });
+    expect(firstResult).toMatchObject({ entryCount: 1, categoryCount: 15, accountCount: 6 });
     expect((await engine.listMonth({ ledgerId: first.ledger.id, month: '2026-02' })).entries[0]?.note).toBe('旧备份记录');
     expect((await engine.listMonth({ ledgerId: DEFAULT_LEDGER_ID, month: '2026-03' })).entries[0]?.note).toBe(
       '保留默认记录',

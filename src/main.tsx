@@ -9,6 +9,7 @@ import './frontend/styles/toast.css';
 import './frontend/styles/components.css';
 import './frontend/styles/auth.css';
 import './frontend/styles/skeleton.css';
+import './frontend/styles/back-gesture.css';
 
 const root = document.getElementById('root');
 if (!root) throw new Error('Root element not found');

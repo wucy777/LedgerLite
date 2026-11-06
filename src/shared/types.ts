@@ -27,7 +27,8 @@ export type IconName =
   | 'alipay'
   | 'bank'
   | 'cash'
-  | 'card';
+  | 'card'
+  | 'ecny';
 
 export interface Category {
   id: string;

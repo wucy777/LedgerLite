@@ -76,7 +76,7 @@
   background: var(--accent);
   box-shadow: var(--shadow-xs);
   transform: translateX(0);
-  transition: transform 240ms var(--ease-spring);
+  transition: transform var(--scrub-duration) var(--scrub-ease);
 }
 
 .stats-view-switch[data-view='all'] .stats-view-switch__thumb {

@@ -35,7 +35,7 @@ describe('LedgerEngine 基础', () => {
     expect(result.ledgers[0]).toMatchObject({ id: LEDGER, name: '默认账本', sort: 0 });
     expect(result.ledger?.id).toBe(LEDGER);
     expect(result.catalog?.categories).toHaveLength(15);
-    expect(result.catalog?.accounts).toHaveLength(5);
+    expect(result.catalog?.accounts).toHaveLength(6);
     expect(result.catalog?.categories.every((category) => category.preset)).toBe(true);
     expect(result.version).toMatch(/^1\.0\.0/);
   });
@@ -328,6 +328,38 @@ describe('LedgerEngine 基础', () => {
     ).rejects.toMatchObject({ code: 'VALIDATION' });
   });
 
+  it('旧账本目录缺少新增的预设账户时会在读取时补齐', async () => {
+    const dbName = `ledgerlite-preset-${Date.now()}-${sequence}`;
+    sequence += 1;
+    dbNames.add(dbName);
+    const engine = new LedgerEngine({ factory: indexedDB, dbName });
+    engines.push(engine);
+    await engine.initialize();
+
+    // A catalog written by an older build has no 数字人民币 account.
+    const seeded = await engine.exportBackup(LEDGER);
+    const trimmed = {
+      ...seeded,
+      catalog: {
+        ...seeded.catalog,
+        accounts: seeded.catalog.accounts.filter((account) => account.id !== 'acc_ecny'),
+      },
+    };
+    expect(trimmed.catalog.accounts).toHaveLength(5);
+    await engine.importBackup(LEDGER, trimmed);
+    await engine.close();
+    engines.pop();
+
+    const reopened = new LedgerEngine({ factory: indexedDB, dbName });
+    engines.push(reopened);
+    const init = await reopened.initialize();
+    expect(init.catalog?.accounts).toHaveLength(6);
+    const ecny = init.catalog?.accounts.find((account) => account.id === 'acc_ecny');
+    expect(ecny).toMatchObject({ name: '数字人民币', icon: 'ecny', preset: true, archived: false });
+    // Existing accounts keep their user edits: no duplicate presets are appended.
+    expect(init.catalog?.accounts.filter((account) => account.id === 'acc_wechat')).toHaveLength(1);
+  });
+
   it('保存记账时严格校验金额、分类、账户与日期', async () => {
     const engine = await setupEngine();
     await expect(engine.saveEntry({ ledgerId: LEDGER, draft: expenseDraft({ amountCents: 0 }) })).rejects.toMatchObject(
@@ -358,7 +390,7 @@ describe('LedgerEngine 基础', () => {
     expect(result.ledgers).toHaveLength(1);
     expect(result.ledgers[0]?.id).toBe(LEDGER);
     expect(result.catalog?.categories).toHaveLength(15);
-    expect(result.catalog?.accounts).toHaveLength(5);
+    expect(result.catalog?.accounts).toHaveLength(6);
     expect((await engine.listMonth({ ledgerId: LEDGER, month: '2026-03' })).entries).toHaveLength(0);
     expect((await engine.getStats(LEDGER, '2026-03')).entryCount).toBe(0);
   });

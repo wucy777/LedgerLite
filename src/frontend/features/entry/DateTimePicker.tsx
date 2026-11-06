@@ -118,7 +118,7 @@ export function DateTimePicker({ value, onCancel, onConfirm }: DateTimePickerPro
   const [draft, setDraft] = useState(() => (Number.isNaN(initial.getTime()) ? new Date() : initial));
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  useBackHandler(onCancel, '关闭时间选择');
+  useBackHandler(onCancel, '关闭时间选择', () => panelRef.current);
 
   useEffect(() => {
     const previous = document.activeElement;

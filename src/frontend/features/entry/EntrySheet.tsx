@@ -162,14 +162,18 @@ export function EntrySheet({ ledgerId, entry, catalog, onClose, onSaved, onDelet
     [onClose],
   );
   dismissRef.current = dismiss;
-  useBackHandler(() => {
-    if (busyRef.current) return;
-    if (confirmingDeleteRef.current) {
-      setConfirmingDelete(false);
-      return;
-    }
-    dismissRef.current();
-  }, '关闭记账面板');
+  useBackHandler(
+    () => {
+      if (busyRef.current) return;
+      if (confirmingDeleteRef.current) {
+        setConfirmingDelete(false);
+        return;
+      }
+      dismissRef.current();
+    },
+    '关闭记一笔',
+    () => panelRef.current,
+  );
 
   useEffect(() => {
     const body = document.body;

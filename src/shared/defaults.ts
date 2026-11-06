@@ -60,6 +60,7 @@ export const DEFAULT_ACCOUNTS: Account[] = [
   { id: 'acc_bank', name: '银行卡', icon: 'bank', color: '#8d7654', archived: false, preset: true, sort: 2 },
   { id: 'acc_cash', name: '现金', icon: 'cash', color: '#7f8b6d', archived: false, preset: true, sort: 3 },
   { id: 'acc_card', name: '信用卡', icon: 'card', color: '#a56d87', archived: false, preset: true, sort: 4 },
+  { id: 'acc_ecny', name: '数字人民币', icon: 'ecny', color: '#b0424a', archived: false, preset: true, sort: 5 },
 ];
 
 export function createDefaultCatalog(): Catalog {

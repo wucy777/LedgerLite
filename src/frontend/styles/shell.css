@@ -67,7 +67,7 @@
   background: color-mix(in srgb, var(--surface) 70%, transparent);
   font-size: 11px;
   font-weight: 600;
-  backdrop-filter: blur(12px);
+  backdrop-filter: var(--blur-pill);
 }
 
 .local-badge svg {
@@ -82,33 +82,35 @@
 }
 
 .page-switch {
-  animation: page-enter-left 280ms var(--ease-out) both;
+  animation: page-in-from-right var(--slide-duration) var(--ease-out) both;
 }
 
 .page-switch--backward {
-  animation-name: page-enter-right;
+  animation-name: page-in-from-left;
 }
 
-/* Tab switches slide in the direction of travel, like a small stack. */
-@keyframes page-enter-left {
+/* Tab switches slide in the direction of travel. Pure translation: scaling a
+   tall page around its centre would drag the visible top edge sideways and
+   down, which reads as a stray offset rather than a page change. */
+@keyframes page-in-from-right {
   from {
     opacity: 0;
-    transform: translate3d(26px, 0, 0) scale(0.99);
+    transform: translate3d(var(--slide-distance), 0, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
-@keyframes page-enter-right {
+@keyframes page-in-from-left {
   from {
     opacity: 0;
-    transform: translate3d(-26px, 0, 0) scale(0.99);
+    transform: translate3d(calc(var(--slide-distance) * -1), 0, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -175,9 +177,9 @@
   padding: 6px 8px;
   border: 1px solid color-mix(in srgb, var(--line-strong) 76%, transparent);
   border-radius: 26px;
-  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  background: var(--bar-surface);
   box-shadow: var(--shadow-lg);
-  backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: var(--blur-bar);
   pointer-events: auto;
 }
 
@@ -192,7 +194,7 @@
   border-radius: 18px;
   background: color-mix(in srgb, var(--accent-soft) 72%, transparent);
   transform: translateX(calc(var(--tab-index, 0) * 100%));
-  transition: transform 320ms var(--ease-spring);
+  transition: transform var(--scrub-duration) var(--scrub-ease);
   pointer-events: none;
 }
 

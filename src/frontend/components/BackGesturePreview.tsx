@@ -1,5 +1,4 @@
 import { Icon, type UIIconName } from './Icon';
-import '../styles/back-gesture.css';
 
 interface BackGesturePreviewProps {
   label: string;

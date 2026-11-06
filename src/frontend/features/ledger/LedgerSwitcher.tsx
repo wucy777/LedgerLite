@@ -177,7 +177,7 @@ export function LedgerSheet({
     }
     requestClose();
   }, [requestClose]);
-  useBackHandler(handleDismiss, '关闭账本选择');
+  useBackHandler(handleDismiss, '关闭账本选择', () => panelRef.current);
 
   useEffect(() => {
     const body = document.body;

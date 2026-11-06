@@ -95,7 +95,7 @@
   align-items: flex-end;
   justify-content: center;
   background: color-mix(in srgb, var(--hero-end) 56%, transparent);
-  backdrop-filter: blur(4px);
+  backdrop-filter: var(--blur-sheet);
   animation: ledger-picker-overlay-in var(--dur-base) var(--ease-soft) both;
 }
 
@@ -492,7 +492,7 @@
   padding: 12px 16px calc(14px + var(--safe-bottom));
   border-top: 1px solid var(--line);
   background: color-mix(in srgb, var(--surface) 94%, transparent);
-  backdrop-filter: blur(12px);
+  backdrop-filter: var(--blur-pill);
 }
 
 .ledger-picker-create {

@@ -77,7 +77,7 @@ describe('备份导出与导入', () => {
     };
 
     const result = await engine.importBackup(DEFAULT_LEDGER_ID, legacy);
-    expect(result).toMatchObject({ entryCount: 2, categoryCount: 15, accountCount: 5 });
+    expect(result).toMatchObject({ entryCount: 2, categoryCount: 15, accountCount: 6 });
     const december = await engine.listMonth({ ledgerId: DEFAULT_LEDGER_ID, month: '2025-12' });
     expect(december.entries.map((entry) => entry.id).sort()).toEqual(['legacy_expense', 'legacy_income']);
     expect(december.summary).toMatchObject({ expenseCents: 1234, incomeCents: 50_000 });
@@ -95,7 +95,7 @@ describe('备份导出与导入', () => {
     expect(backup.entries).toHaveLength(1);
     expect(backup.entries[0]?.note).toBe('导出测试');
     expect(backup.catalog.categories).toHaveLength(15);
-    expect(backup.catalog.accounts).toHaveLength(5);
+    expect(backup.catalog.accounts).toHaveLength(6);
   });
 
   it('导入有效备份会整体替换记录和目录', async () => {
@@ -104,7 +104,7 @@ describe('备份导出与导入', () => {
     await engine.saveEntry({ ledgerId: DEFAULT_LEDGER_ID, draft: expenseDraft({ note: '旧记录', occurredAt: localIso(2026, 1, 1) }) });
 
     const result = await engine.importBackup(DEFAULT_LEDGER_ID, backup);
-    expect(result).toMatchObject({ entryCount: 2, categoryCount: 16, accountCount: 5 });
+    expect(result).toMatchObject({ entryCount: 2, categoryCount: 16, accountCount: 6 });
     expect(result.catalog.categories.some((category) => category.name === '宠物')).toBe(true);
 
     const january = await engine.listMonth({ ledgerId: DEFAULT_LEDGER_ID, month: '2026-01' });

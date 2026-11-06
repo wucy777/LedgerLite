@@ -14,7 +14,7 @@ import { QuickAddFab } from './components/QuickAddFab';
 import { ToastProvider, useToast } from './components/ToastProvider';
 import { LedgerSheet, LedgerTrigger } from './features/ledger/LedgerSwitcher';
 import { usePredictiveBack } from './features/navigation/usePredictiveBack';
-import { getTopBackHandler, runTopBackHandler } from './features/settings/overlay';
+import { getTopBackHandler, runTopBackHandler, useBackStackTop } from './features/settings/overlay';
 import { LedgerPage } from './pages/LedgerPage';
 
 type TabId = 'ledger' | 'stats' | 'settings';
@@ -134,13 +134,18 @@ function AppController() {
     [],
   );
 
-  const appRef = useRef<HTMLDivElement | null>(null);
   const tabIndex = TAB_ORDER.indexOf(tab);
+  const backTop = useBackStackTop();
+  // A sheet owning back previews its own dismissal; otherwise a non-ledger tab
+  // previews the return to 明细.
   const predictiveBack = usePredictiveBack({
     onCommit: handleSystemBack,
-    previewEnabled: tab !== 'ledger' && !sheet && !ledgerSheetOpen,
-    targetRef: appRef,
+    previewEnabled: backTop !== null || tab !== 'ledger',
+    pagePreview: backTop === null && tab !== 'ledger',
   });
+  // The 明细 destination panel only makes sense for a page-level back; while a
+  // sheet owns back, that sheet previews its own dismissal instead.
+  const pageBackPreview = predictiveBack.active && backTop === null && tab !== 'ledger';
 
   const applyLedgerSession = useCallback(
     async (result: InitResult, preferredLedgerId: string | null = readActiveLedgerId()) => {
@@ -414,8 +419,8 @@ function AppController() {
   };
 
   return (
-    <div className={`app${predictiveBack.active ? ' is-back-gesturing' : ''}`} ref={appRef}>
-      {predictiveBack.active ? (
+    <div className="app">
+      {pageBackPreview ? (
         <BackGesturePreview
           label="明细"
           detail={`返回 ${monthLabel(month)} 的记账明细`}

@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Capacitor } from '@capacitor/core';
+import { getTopBackElement } from '../settings/overlay';
 
 const EDGE_WIDTH = 22;
 const COMMIT_RATIO = 0.32;
@@ -10,10 +11,10 @@ const SETTLE_MS = 200;
 interface Options {
   /** Runs when a back gesture commits (system gesture, edge swipe or hardware key). */
   onCommit: () => void;
-  /** Whether the current screen has a destination worth previewing. */
+  /** Whether a back gesture can be previewed right now. */
   previewEnabled: boolean;
-  /** Element that receives `--back-progress` and the `is-back-gesturing` class. */
-  targetRef: RefObject<HTMLElement | null>;
+  /** Whether the preview is the page sliding away (instead of an overlay closing). */
+  pagePreview: boolean;
 }
 
 export interface PredictiveBackState {
@@ -41,30 +42,45 @@ function isNativePlatform(): boolean {
  * Predictive back, following Android's own gesture model.
  *
  * On Android the system owns the edge swipe and streams its progress through
- * `OnBackAnimationCallback`; `MainActivity` forwards it to the small
+ * `OnBackPressedCallback`; `MainActivity` forwards it to the small
  * `__ledgerBack*` bridge below. On the web an equivalent pointer gesture on the
- * left edge produces the same calls. Progress is written straight to the DOM,
- * so dragging never re-renders React.
+ * left edge produces the same calls.
+ *
+ * Progress is written straight to the DOM — one custom property plus two
+ * classes — so dragging never re-renders React. The property lives on `<html>`
+ * and inherits into portalled overlays, which lets a sheet preview its own
+ * dismissal while the page-level card lift stays a separate class.
  */
-export function usePredictiveBack({ onCommit, previewEnabled, targetRef }: Options): PredictiveBackState {
+export function usePredictiveBack({ onCommit, previewEnabled, pagePreview }: Options): PredictiveBackState {
   const [active, setActive] = useState(false);
   const [armed, setArmed] = useState(false);
   const commitRef = useRef(onCommit);
   commitRef.current = onCommit;
   const previewRef = useRef(previewEnabled);
   previewRef.current = previewEnabled;
+  const pagePreviewRef = useRef(pagePreview);
+  pagePreviewRef.current = pagePreview;
   const settleTimer = useRef<number | null>(null);
   const activeRef = useRef(false);
+  const previewTarget = useRef<HTMLElement | null>(null);
 
-  const paint = useCallback(
-    (progress: number, gesturing: boolean) => {
-      const target = targetRef.current;
-      if (!target) return;
-      target.style.setProperty('--back-progress', progress.toFixed(4));
-      target.classList.toggle('is-back-gesturing', gesturing);
-    },
-    [targetRef],
-  );
+  const paint = useCallback((progress: number, gesturing: boolean) => {
+    const root = document.documentElement;
+    if (gesturing) root.style.setProperty('--back-progress', progress.toFixed(4));
+    else root.style.removeProperty('--back-progress');
+    root.classList.toggle('is-back-gesturing', gesturing);
+    root.classList.toggle('is-page-preview', gesturing && pagePreviewRef.current);
+  }, []);
+
+  const clearPreviewTarget = useCallback(() => {
+    const target = previewTarget.current;
+    if (target) {
+      target.classList.remove('is-back-preview');
+      // The entrance animation is restored so the sheet can animate out normally.
+      target.parentElement?.classList.remove('is-back-root');
+    }
+    previewTarget.current = null;
+  }, []);
 
   const clearSettle = useCallback(() => {
     if (settleTimer.current === null) return;
@@ -75,9 +91,20 @@ export function usePredictiveBack({ onCommit, previewEnabled, targetRef }: Optio
   const begin = useCallback(() => {
     if (!previewRef.current) return;
     clearSettle();
+    clearPreviewTarget();
+    // Overlays preview their own dismissal; only a page-level back lifts the card.
+    if (!pagePreviewRef.current) {
+      const element = getTopBackElement();
+      if (element) {
+        element.classList.add('is-back-preview');
+        // The panel's container owns the scrim, which fades out with the gesture.
+        element.parentElement?.classList.add('is-back-root');
+        previewTarget.current = element;
+      }
+    }
     activeRef.current = true;
     setActive(true);
-  }, [clearSettle]);
+  }, [clearPreviewTarget, clearSettle]);
 
   const update = useCallback(
     (progress: number) => {
@@ -95,6 +122,7 @@ export function usePredictiveBack({ onCommit, previewEnabled, targetRef }: Optio
       activeRef.current = false;
       setArmed(false);
       paint(0, false);
+      clearPreviewTarget();
       if (wasActive) {
         if (commit) setActive(false);
         else {
@@ -108,7 +136,7 @@ export function usePredictiveBack({ onCommit, previewEnabled, targetRef }: Optio
       }
       if (commit) commitRef.current();
     },
-    [clearSettle, paint],
+    [clearPreviewTarget, clearSettle, paint],
   );
 
   // Bridge consumed by MainActivity: the native back callback drives the same

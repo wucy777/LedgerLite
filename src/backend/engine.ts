@@ -1,6 +1,7 @@
 import {
   createDefaultCatalog,
   createDefaultLedger,
+  DEFAULT_ACCOUNTS,
   LEDGER_COLORS,
 } from '../shared/defaults';
 import { daysInMonth, localDateKey, monthKeyOfIso } from '../shared/date';
@@ -125,6 +126,19 @@ function cloneCatalog(catalog: Catalog): Catalog {
     categories: catalog.categories.map((category) => ({ ...category })),
     accounts: catalog.accounts.map((account) => ({ ...account })),
   };
+}
+
+/**
+ * Adds preset accounts that a stored catalog predates. Users who archived or
+ * renamed an account keep it as-is; only genuinely missing ids are appended.
+ */
+function withPresetAccounts(catalog: Catalog): Catalog {
+  const known = new Set(catalog.accounts.map((account) => account.id));
+  const missing = DEFAULT_ACCOUNTS.filter((account) => !known.has(account.id));
+  if (missing.length === 0) return catalog;
+  const next = cloneCatalog(catalog);
+  next.accounts.push(...missing.map((account) => ({ ...account })));
+  return next;
 }
 
 function cloneLedger(ledger: Ledger): Ledger {
@@ -1116,8 +1130,12 @@ export class LedgerEngine {
     const key = catalogKey(ledgerId);
     const record = await this.database.get<CatalogRecord>(KV_STORE, key);
     if (record && record.key === key) {
-      const catalog = await this.decodeValue(record.payload, CATALOG_AAD);
-      this.catalogs.set(ledgerId, catalog);
+      const stored = await this.decodeValue(record.payload, CATALOG_AAD);
+      // Catalogs saved by older builds predate preset accounts added since; top
+      // them up once so existing ledgers gain the same defaults as new ones.
+      const catalog = withPresetAccounts(stored);
+      if (catalog !== stored) await this.saveCatalog(ledgerId, catalog);
+      else this.catalogs.set(ledgerId, catalog);
       return catalog;
     }
     const catalog = createDefaultCatalog();
