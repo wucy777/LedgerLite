@@ -70,8 +70,8 @@ jobs:
       - name: Publish APK release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v0.1.0-beta
-          name: LedgerLite 0.1.0-beta
+          tag_name: v1.0.0-beta
+          name: LedgerLite 1.0.0-beta
           body: |
             自动构建的 Android 调试 APK。
           files: android/app/build/outputs/apk/debug/app-debug.apk

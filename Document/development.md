@@ -1,6 +1,6 @@
 # 开发指南
 
-版本：0.1.0-beta
+版本：1.0.0-beta
 
 ## 1. 环境
 
@@ -86,7 +86,7 @@ npm run dev
 
 ## 8. 版本
 
-开发版本遵循语义化版本，当前为 `0.1.0-beta`。版本号需同时出现在：
+开发版本遵循语义化版本，当前为 `1.0.0-beta`。版本号需同时出现在：
 
 - `package.json`
 - `android/app/build.gradle` 的 `versionName`

@@ -3,8 +3,9 @@
   z-index: 80;
   inset: 0;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
+  padding: calc(var(--safe-top) + 16px) 14px calc(var(--safe-bottom) + 16px);
   animation: date-picker-fade 200ms ease both;
 }
 
@@ -19,10 +20,13 @@
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 460px;
-  padding: 6px 18px calc(16px + var(--safe-bottom));
+  max-width: 440px;
+  max-height: 100%;
+  padding: 6px 18px 16px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   color: var(--ink);
-  border-radius: 30px 30px 0 0;
+  border-radius: 30px;
   background:
     radial-gradient(120% 80% at 50% -30%, var(--accent-wash), transparent 58%),
     var(--surface);
@@ -39,16 +43,8 @@
 @keyframes date-picker-up {
   from {
     opacity: 0;
-    transform: translate3d(0, 24px, 0);
+    transform: translate3d(0, 18px, 0) scale(0.97);
   }
-}
-
-.date-picker__grabber {
-  width: 38px;
-  height: 4px;
-  margin: 4px auto 10px;
-  border-radius: var(--radius-pill);
-  background: var(--line-strong);
 }
 
 .date-picker__head {

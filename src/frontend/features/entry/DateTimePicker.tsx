@@ -186,7 +186,6 @@ export function DateTimePicker({ value, onCancel, onConfirm }: DateTimePickerPro
     <div className="date-picker" role="dialog" aria-modal="true" aria-label="选择日期与时间">
       <div className="date-picker__scrim" aria-hidden="true" onClick={onCancel} />
       <div className="date-picker__panel" ref={panelRef}>
-        <div className="date-picker__grabber" aria-hidden="true" />
         <header className="date-picker__head">
           <div>
             <p className="date-picker__eyebrow">发生时间</p>

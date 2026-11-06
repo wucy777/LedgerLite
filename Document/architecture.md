@@ -1,6 +1,6 @@
 # 架构说明
 
-本文描述简账的运行结构、数据边界与扩展方式。版本：0.1.0-beta。
+本文描述简账的运行结构、数据边界与扩展方式。版本：1.0.0-beta。
 
 ## 1. 设计目标
 
@@ -31,7 +31,7 @@ src/
    ├─ App.tsx                  会话、月份、导航、页面编排
    ├─ pages/                   明细 / 统计 / 设置
    ├─ features/                录入面板、日期时间面板、统计组件、设置组件
-   │  ├─ navigation/           预测式返回手势（边缘指针 → CSS 变量）
+   │  ├─ navigation/           预测性返回（系统手势/边缘指针 → CSS 变量）
    │  └─ settings/             数据、加密、分类、显示偏好
    ├─ components/              图标、排版组件、Toast、弹层与返回预览
    ├─ hooks/                   请求状态管理
@@ -172,9 +172,9 @@ master bits (256)
 
 ### 6.1 交互与渲染约定
 
-- 底部导航切换：`.page-switch` 以 300ms 缩放淡入；当前 tab 的底色、图标与圆点各自过渡。
+- 底部导航：`.tabbar__thumb` 单一滑块由 `--tab-index` 驱动 `translateX`；页面按切换方向以 `page-switch--forward/backward` 左右滑入。
 - 筛选滑块：`.ledger-filters__thumb` 与 `.stats-view-switch__thumb` 共用 `--filter-index` / `data-view` 驱动 `translateX`。
-- 预测式返回：`useEdgeBackGesture` 监听左边缘指针，把进度写入 `.app` 的 `--back-progress`；`.app__body` 抬升为卡片，目的地面板位于其下层。松手越过 32% 阈值即提交，滑回则复位。
+- 预测性返回：Android 13+ 由 `MainActivity` 的 `OnBackPressedCallback` 把系统手势（start/progress/cancel/press）桥接到 `window.__ledgerBack*`；`usePredictiveBack` 把进度写入 `.app` 的 `--back-progress`，`.app__body` 抬升为卡片、目的地面板垫在下层。松手越过 32% 阈值执行返回，滑回复位；Web 端由左缘指针手势模拟同一状态机。
 - 高刷新率：`useHighRefreshPreference` 在 `<html>` 上加 `is-high-refresh` 缩短动画时长；Android 侧由 `DisplayModePlugin` 通过 `preferredDisplayModeId` 请求最高刷新模式，Web 端仅切换动画节奏。
 - 启动：`index.html` 内联启动屏与 `BootScreen` 共享布局与配色，避免 React 挂载前后闪屏。
 

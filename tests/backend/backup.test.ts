@@ -90,7 +90,7 @@ describe('备份导出与导入', () => {
     const backup = await engine.exportBackup(DEFAULT_LEDGER_ID);
     expect(backup.app).toBe('ledgerlite');
     expect(backup.schema).toBe(2);
-    expect(backup.version).toMatch(/^0\.1\.0/);
+    expect(backup.version).toMatch(/^1\.0\.0/);
     expect(Number.isNaN(Date.parse(backup.exportedAt))).toBe(false);
     expect(backup.entries).toHaveLength(1);
     expect(backup.entries[0]?.note).toBe('导出测试');

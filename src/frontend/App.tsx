@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { App as CapacitorApp } from '@capacitor/app';
 import { Capacitor } from '@capacitor/core';
 import type { Catalog, Entry, ImportLedgerResult, InitResult, Ledger } from '@shared/types';
@@ -13,11 +13,13 @@ import { PageSkeleton } from './components/PageSkeleton';
 import { QuickAddFab } from './components/QuickAddFab';
 import { ToastProvider, useToast } from './components/ToastProvider';
 import { LedgerSheet, LedgerTrigger } from './features/ledger/LedgerSwitcher';
-import { useEdgeBackGesture } from './features/navigation/useEdgeBackGesture';
+import { usePredictiveBack } from './features/navigation/usePredictiveBack';
 import { getTopBackHandler, runTopBackHandler } from './features/settings/overlay';
 import { LedgerPage } from './pages/LedgerPage';
 
 type TabId = 'ledger' | 'stats' | 'settings';
+
+const TAB_ORDER: readonly TabId[] = ['ledger', 'stats', 'settings'];
 
 interface SheetState {
   entry: Entry | null;
@@ -77,12 +79,26 @@ function AppController() {
   const [ledgerSheetOpen, setLedgerSheetOpen] = useState(false);
   const [fabDocked, setFabDocked] = useState(false);
   const [tab, setTab] = useState<TabId>('ledger');
+  const [tabDirection, setTabDirection] = useState<'forward' | 'backward'>('forward');
   const [month, setMonth] = useState(() => currentMonthKey());
   const [revision, setRevision] = useState(0);
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const exitArmed = useRef(false);
   const exitArmTimer = useRef<number | null>(null);
 
+  /** Tab order defines the slide direction when switching pages. */
+  const navigateTab = useCallback((next: TabId) => {
+    setTab((current) => {
+      if (current === next) return current;
+      setTabDirection(TAB_ORDER.indexOf(next) >= TAB_ORDER.indexOf(current) ? 'forward' : 'backward');
+      return next;
+    });
+  }, []);
+
+  /**
+   * Single back entry point: the Android back callback, the edge-swipe gesture
+   * and the hardware key all funnel into this handler.
+   */
   const handleSystemBack = useCallback(() => {
     const topOverlay = getTopBackHandler();
     if (topOverlay) {
@@ -90,7 +106,7 @@ function AppController() {
       return;
     }
     if (tab !== 'ledger') {
-      setTab('ledger');
+      navigateTab('ledger');
       return;
     }
     if (!exitArmed.current) {
@@ -109,24 +125,7 @@ function AppController() {
     } else {
       window.history.back();
     }
-  }, [showToast, tab]);
-
-  useEffect(() => {
-    let removeListener: (() => Promise<void>) | null = null;
-    let cancelled = false;
-    void CapacitorApp.addListener('backButton', handleSystemBack)
-      .then((handle) => {
-        removeListener = () => handle.remove();
-        if (cancelled) void removeListener();
-      })
-      .catch(() => {
-        // The native App plugin is unavailable in a plain browser preview.
-      });
-    return () => {
-      cancelled = true;
-      void removeListener?.();
-    };
-  }, [handleSystemBack]);
+  }, [navigateTab, showToast, tab]);
 
   useEffect(
     () => () => {
@@ -136,10 +135,10 @@ function AppController() {
   );
 
   const appRef = useRef<HTMLDivElement | null>(null);
-  const edgeBackEnabled = tab !== 'ledger' && !sheet && !ledgerSheetOpen;
-  const edgeBack = useEdgeBackGesture({
-    onCommit: useCallback(() => setTab('ledger'), []),
-    enabled: edgeBackEnabled,
+  const tabIndex = TAB_ORDER.indexOf(tab);
+  const predictiveBack = usePredictiveBack({
+    onCommit: handleSystemBack,
+    previewEnabled: tab !== 'ledger' && !sheet && !ledgerSheetOpen,
     targetRef: appRef,
   });
 
@@ -240,7 +239,7 @@ function AppController() {
       if (next.status === 'locked') {
         setSheet(null);
         setLedgerSheetOpen(false);
-        setTab('ledger');
+        navigateTab('ledger');
       }
     },
     [activeLedger?.id, applyLedgerSession],
@@ -252,7 +251,7 @@ function AppController() {
       setRevision((value) => value + 1);
       setMonth(monthKeyOfIso(entry.occurredAt));
       setSheet(null);
-      setTab('ledger');
+      navigateTab('ledger');
       window.scrollTo({ top: 0, behavior: 'auto' });
       showToast(wasEditing ? '记录已更新' : '已记一笔', 'success');
     },
@@ -288,7 +287,7 @@ function AppController() {
       setMonth(currentMonthKey());
       setRevision((value) => value + 1);
       setSheet(null);
-      setTab('ledger');
+      navigateTab('ledger');
       showToast(`已切换到「${data.ledger.name}」`, 'success');
     },
     [activeLedger?.id, client, showToast],
@@ -305,7 +304,7 @@ function AppController() {
       setMonth(currentMonthKey());
       setRevision((value) => value + 1);
       setSheet(null);
-      setTab('ledger');
+      navigateTab('ledger');
       showToast(`已创建「${result.ledger.name}」`, 'success');
     },
     [client, showToast],
@@ -323,7 +322,7 @@ function AppController() {
     setRevision((value) => value + 1);
     setSheet(null);
     setLedgerSheetOpen(false);
-    setTab('ledger');
+    navigateTab('ledger');
   }, []);
 
   const handleRenameLedger = useCallback(
@@ -352,7 +351,7 @@ function AppController() {
           setCatalog(null);
         }
         setRevision((value) => value + 1);
-        setTab('ledger');
+        navigateTab('ledger');
       }
       showToast(`已删除「${ledger.name}」`, 'success');
     },
@@ -415,13 +414,13 @@ function AppController() {
   };
 
   return (
-    <div className={`app${edgeBack.active ? ' is-back-gesturing' : ''}`} ref={appRef}>
-      {edgeBack.active ? (
+    <div className={`app${predictiveBack.active ? ' is-back-gesturing' : ''}`} ref={appRef}>
+      {predictiveBack.active ? (
         <BackGesturePreview
           label="明细"
           detail={`返回 ${monthLabel(month)} 的记账明细`}
           icon="ledger"
-          armed={edgeBack.armed}
+          armed={predictiveBack.armed}
         />
       ) : null}
       <aside className="rail" aria-label="应用导航">
@@ -446,7 +445,7 @@ function AppController() {
               type="button"
               className={`rail__tab ${tab === item.id ? 'is-active' : ''}`}
               aria-current={tab === item.id ? 'page' : undefined}
-              onClick={() => setTab(item.id)}
+              onClick={() => navigateTab(item.id)}
             >
               <Icon name={item.icon} size={19} />
               {item.label}
@@ -490,19 +489,24 @@ function AppController() {
         </header>
 
         <main className="app-content">
-          <div className="page-switch" key={tab}>
+          <div className={`page-switch page-switch--${tabDirection}`} key={tab}>
             <Suspense fallback={<PageSkeleton />}>{renderPage()}</Suspense>
           </div>
         </main>
 
         <div className="tabbar-wrap">
           <QuickAddFab docked={fabDocked} onDockChange={setFabDocked} onAdd={openAdd} />
-          <nav className={`tabbar${fabDocked ? ' tabbar--fab-docked' : ''}`} aria-label="底部导航">
+          <nav
+            className={`tabbar${fabDocked ? ' tabbar--fab-docked' : ''}`}
+            aria-label="底部导航"
+            style={{ '--tab-index': tabIndex } as CSSProperties}
+          >
+            <span className="tabbar__thumb" aria-hidden="true" />
             <button
               type="button"
               className={`tab ${tab === 'ledger' ? 'is-active' : ''}`}
               aria-current={tab === 'ledger' ? 'page' : undefined}
-              onClick={() => setTab('ledger')}
+              onClick={() => navigateTab('ledger')}
             >
               <Icon name="ledger" size={20} />
               <span>明细</span>
@@ -511,7 +515,7 @@ function AppController() {
               type="button"
               className={`tab ${tab === 'stats' ? 'is-active' : ''}`}
               aria-current={tab === 'stats' ? 'page' : undefined}
-              onClick={() => setTab('stats')}
+              onClick={() => navigateTab('stats')}
             >
               <Icon name="chart" size={20} />
               <span>统计</span>
@@ -520,7 +524,7 @@ function AppController() {
               type="button"
               className={`tab ${tab === 'settings' ? 'is-active' : ''}`}
               aria-current={tab === 'settings' ? 'page' : undefined}
-              onClick={() => setTab('settings')}
+              onClick={() => navigateTab('settings')}
             >
               <Icon name="settings" size={20} />
               <span>设置</span>

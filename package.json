@@ -1,6 +1,6 @@
 {
   "name": "ledgerlite",
-  "version": "0.1.0-beta",
+  "version": "1.0.0-beta",
   "private": true,
   "type": "module",
   "description": "Offline-first, local-encrypted ledger for Android and the web.",

@@ -71,8 +71,8 @@ export function SettingsPage({
       </header>
 
       <div className="settings-layout">
-        <DisplaySection />
         <EncryptionSection crypto={crypto} onSessionChange={onSessionChange} onLock={onLock} />
+        <DisplaySection />
         <DataSection
           ledgerId={ledgerId}
           encrypted={crypto.enabled}

@@ -1,5 +1,5 @@
 export const APP_NAME = '简账';
-export const APP_VERSION = '0.1.0-beta';
+export const APP_VERSION = '1.0.0-beta';
 export const BACKUP_SCHEMA = 2;
 export const ENCRYPTED_BACKUP_SCHEMA = 1;
 

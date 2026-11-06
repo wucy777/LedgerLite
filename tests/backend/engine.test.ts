@@ -37,7 +37,7 @@ describe('LedgerEngine 基础', () => {
     expect(result.catalog?.categories).toHaveLength(15);
     expect(result.catalog?.accounts).toHaveLength(5);
     expect(result.catalog?.categories.every((category) => category.preset)).toBe(true);
-    expect(result.version).toMatch(/^0\.1\.0/);
+    expect(result.version).toMatch(/^1\.0\.0/);
   });
 
   it('创建、更新、删除记账记录', async () => {

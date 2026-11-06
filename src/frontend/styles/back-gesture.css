@@ -19,14 +19,22 @@
   flex-direction: column;
   justify-content: center;
   gap: 6px;
-  padding: calc(var(--safe-top) + 22px) 26px calc(var(--safe-bottom) + 22px);
+  padding: calc(var(--safe-top) + 22px) 24px calc(var(--safe-bottom) + 22px) 26px;
   color: var(--hero-ink);
   background:
     radial-gradient(90% 60% at 6% 12%, rgba(255, 255, 255, 0.1), transparent 62%),
     linear-gradient(150deg, var(--hero-start), var(--hero-end));
-  opacity: calc(0.25 + var(--back-progress, 0) * 0.75);
-  transform: translate3d(calc((var(--back-progress, 0) - 1) * 18%), 0, 0);
+  /* The destination stays put, exactly like Android's predictive back: only the
+     foreground card moves. A little parallax is enough to feel alive. */
+  opacity: calc(0.35 + var(--back-progress, 0) * 0.65);
+  transform: translate3d(calc(var(--back-progress, 0) * 6%), 0, 0);
   will-change: transform, opacity;
+}
+
+.back-gesture__label,
+.back-gesture__detail,
+.back-gesture__eyebrow {
+  max-width: 190px;
 }
 
 .back-gesture__eyebrow {
@@ -90,11 +98,11 @@
 
 .app.is-back-gesturing .app__body {
   overflow: hidden;
-  border-radius: 0 28px 28px 0;
+  border-radius: 0 30px 30px 0;
   background: var(--bg);
   box-shadow: var(--shadow-lg);
-  transform: translate3d(calc(var(--back-progress, 0) * 22%), 0, 0)
-    scale(calc(1 - var(--back-progress, 0) * 0.05));
+  transform: translate3d(calc(var(--back-progress, 0) * 88%), 0, 0)
+    scale(calc(1 - var(--back-progress, 0) * 0.045));
   transform-origin: 0% 50%;
   transition: none;
 }
