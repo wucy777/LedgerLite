@@ -109,46 +109,23 @@
   transition: none;
 }
 
-/* A layer being dismissed by the gesture. These panels animate in with `fill:
-   both`, which keeps ownership of `transform`; the gesture therefore drives the
-   independent `translate`/`scale` properties, which compose with that transform
-   instead of fighting it (and so never replay the entrance on a cancel). */
-.is-back-preview {
-  transition: none;
+/* An overlay that owns back previews its own dismissal: `usePredictiveBack`
+   writes `--sheet-progress` on the panel's container and `translate`/`scale` on
+   the panel itself. Both are inline styles, because React re-renders the sheet
+   when it starts closing and would drop a class added from the outside. */
+
+/* Bottom sheets peel downwards, centred panels follow the finger sideways. */
+.entry-sheet__panel,
+.settings-sheet,
+.ledger-picker-sheet {
+  transform-origin: 50% 100%;
   will-change: translate, scale;
 }
 
-/* The backdrop clears out with the gesture, so the page it hid comes back. */
-.entry-sheet.is-back-root .entry-sheet__scrim,
-.date-picker.is-back-root .date-picker__scrim {
-  opacity: calc(1 - var(--back-progress, 0) * 0.8);
-  transition: none;
-}
-
-/* These two double as their own backdrop, so the tint is faded rather than the
-   element: `opacity` would also wash out the panel inside it. */
-.settings-overlay.is-back-root,
-.ledger-picker-overlay.is-back-root {
-  backdrop-filter: none;
-  background: color-mix(in srgb, var(--hero-end) calc(54% - var(--back-progress, 0) * 54%), transparent);
-  transition: none;
-}
-
-/* Bottom sheets peel away downward… */
-.entry-sheet__panel.is-back-preview,
-.settings-sheet.is-back-preview,
-.ledger-picker-sheet.is-back-preview {
-  translate: 0 calc(var(--back-progress, 0) * 34%);
-  scale: calc(1 - var(--back-progress, 0) * 0.04);
-  transform-origin: 50% 100%;
-}
-
-/* …while centred panels follow the finger to the right. */
-.date-picker__panel.is-back-preview,
-.settings-dialog.is-back-preview {
-  translate: calc(var(--back-progress, 0) * 26%) 0;
-  scale: calc(1 - var(--back-progress, 0) * 0.06);
+.date-picker__panel,
+.settings-dialog {
   transform-origin: 0% 50%;
+  will-change: translate, scale;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -156,8 +133,7 @@
     transition: none;
   }
 
-  :root.is-page-preview .app__body,
-  .is-back-preview {
+  :root.is-page-preview .app__body {
     transform: none;
   }
 }

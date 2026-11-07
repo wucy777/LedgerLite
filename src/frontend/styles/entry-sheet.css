@@ -14,6 +14,8 @@
   position: absolute;
   inset: 0;
   background: color-mix(in srgb, var(--hero-end) 62%, transparent);
+  /* Written by usePredictiveBack while a back swipe previews this layer. */
+  opacity: calc(1 - var(--sheet-progress, 0) * 0.85);
 }
 
 .entry-sheet__panel {

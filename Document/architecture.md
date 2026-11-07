@@ -172,10 +172,11 @@ master bits (256)
 
 ### 6.1 交互与渲染约定
 
-- 底部导航：`.tabbar__thumb` 单一滑块由 `--tab-index` 驱动 `translateX`；页面按切换方向以 `page-switch--forward/backward` 左右滑入（纯位移，不用缩放）。
+- 底部导航：`.tabbar__thumb` 单一滑块由 `--tab-index` 驱动 `translateX`，宽度由 `--pad-l/--pad-r` 推导（+ 入栏时 `--pad-r` 变成 74px，滑块与三个 tab 一起变窄）；页面切换只做 `--fade-duration` 淡入，不使用任何 `transform`。
 - 筛选滑块：`.ledger-filters__thumb` 与 `.stats-view-switch__thumb` 共用 `--filter-index` / `data-view` 驱动 `translateX`，时长取自 `--scrub-duration`。
-- 预测性返回：Android 13+ 由 `MainActivity` 的 `OnBackPressedCallback` 把系统手势（start/progress/cancel/press）桥接到 `window.__ledgerBack*`；`usePredictiveBack` 把进度写到 `<html>` 的 `--back-progress`。有二级页时（`useBackStackTop` 非空）只给该面板加 `is-back-preview`，面板用 `translate` / `scale` 属性预览被划走；只有返回明细才给 `<html>` 加 `is-page-preview`，让 `.app__body` 抬升为卡片并露出目的地面板。松手越过 32% 阈值执行返回，滑回复位；Web 端由左缘指针手势模拟同一状态机。
-- 高刷新率：`useHighRefreshPreference` 在 `<html>` 上加 `is-high-refresh`，同时切换 `--dur-*`、`--scrub-duration`、`--slide-duration`、`--stagger` 与 `--blur-*`（关掉固定栏毛玻璃，减少滚动时的重滤镜开销）；Android 侧由 `DisplayModePlugin` 通过 `preferredDisplayModeId` 请求最高刷新模式。
+- 预测性返回：Android 13+ 由 `MainActivity` 的 `OnBackPressedCallback` 把系统手势（start/progress/cancel/press）桥接到 `window.__ledgerBack*`。有二级页时（`useBackStackTop` 非空）只预览该层：`--sheet-progress` 写在面板容器上驱动遮罩淡出，面板本身用内联 `translate`/`scale` 跟手；这些都用内联样式，因为 React 重渲染会覆盖外部添加的 className。只有返回明细才给 `<html>` 加 `is-page-preview`，让 `.app__body` 抬升为卡片并露出目的地面板。松手越过 32% 阈值执行返回，滑回复位；Web 端由左缘指针手势模拟同一状态机。
+- 高刷新率：`useHighRefreshPreference` 在 `<html>` 上加 `is-high-refresh`，同时切换 `--dur-*`、`--scrub-duration`、`--fade-duration`、`--stagger` 与 `--blur-*`（关掉固定栏毛玻璃，减少滚动时的重滤镜开销）；Android 侧由 `DisplayModePlugin` 通过 `preferredDisplayModeId` 请求最高刷新模式。
+- 底部安全区：`--safe-bottom` 取 `env(safe-area-inset-bottom)` 与 12px 的较大值，避免 Android WebView 上报 0 inset 时导航条压到系统手势条上。
 - 启动：`index.html` 内联启动屏与 `BootScreen` 共享布局与配色，避免 React 挂载前后闪屏。
 
 ## 7. 导出路径

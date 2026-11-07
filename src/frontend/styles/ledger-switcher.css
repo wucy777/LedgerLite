@@ -94,7 +94,7 @@
   display: flex;
   align-items: flex-end;
   justify-content: center;
-  background: color-mix(in srgb, var(--hero-end) 56%, transparent);
+  background: color-mix(in srgb, var(--hero-end) calc(56% - var(--sheet-progress, 0) * 56%), transparent);
   backdrop-filter: var(--blur-sheet);
   animation: ledger-picker-overlay-in var(--dur-base) var(--ease-soft) both;
 }

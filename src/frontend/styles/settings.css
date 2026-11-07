@@ -723,7 +723,7 @@
   inset: 0;
   display: flex;
   justify-content: center;
-  background: color-mix(in srgb, var(--hero-end) 52%, transparent);
+  background: color-mix(in srgb, var(--hero-end) calc(52% - var(--sheet-progress, 0) * 52%), transparent);
   backdrop-filter: var(--blur-sheet);
   animation: settings-overlay-in var(--dur-base) var(--ease-soft) both;
 }

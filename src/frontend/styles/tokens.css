@@ -71,14 +71,15 @@
   /* Duration of a dragged thumb/slider following an index change. */
   --scrub-duration: 260ms;
   --scrub-ease: var(--ease-spring);
-  /* Page-level slide when switching tabs. */
-  --slide-duration: 280ms;
-  --slide-distance: 28px;
+  /* Page-level cross-fade when switching tabs (no transform, no layout shift). */
+  --fade-duration: 190ms;
   /* Per-item delay for list reveals; capped by the consumer. */
   --stagger: 40ms;
 
   --safe-top: max(env(safe-area-inset-top, 0px), 12px);
-  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 0px);
+  /* Android WebViews often report a 0 bottom inset even when the gesture bar
+     overlaps the view, so a floor keeps the tab bar clear of it. */
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
 
   --tabbar-height: 66px;
   --content-width: 780px;
@@ -100,8 +101,7 @@
   --bar-surface: var(--surface);
   --scrub-duration: 120ms;
   --scrub-ease: var(--ease-out);
-  --slide-duration: 170ms;
-  --slide-distance: 18px;
+  --fade-duration: 120ms;
   --stagger: 18ms;
 }
 

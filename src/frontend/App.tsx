@@ -79,20 +79,23 @@ function AppController() {
   const [ledgerSheetOpen, setLedgerSheetOpen] = useState(false);
   const [fabDocked, setFabDocked] = useState(false);
   const [tab, setTab] = useState<TabId>('ledger');
-  const [tabDirection, setTabDirection] = useState<'forward' | 'backward'>('forward');
   const [month, setMonth] = useState(() => currentMonthKey());
   const [revision, setRevision] = useState(0);
   const [sheet, setSheet] = useState<SheetState | null>(null);
   const exitArmed = useRef(false);
   const exitArmTimer = useRef<number | null>(null);
 
-  /** Tab order defines the slide direction when switching pages. */
+  /** Switches tab and clears any gesture state a interrupted back swipe left behind. */
   const navigateTab = useCallback((next: TabId) => {
-    setTab((current) => {
-      if (current === next) return current;
-      setTabDirection(TAB_ORDER.indexOf(next) >= TAB_ORDER.indexOf(current) ? 'forward' : 'backward');
-      return next;
-    });
+    setTab((current) => (current === next ? current : next));
+    const root = document.documentElement;
+    if (root.classList.contains('is-page-preview') || root.classList.contains('is-back-gesturing')) {
+      root.classList.remove('is-page-preview', 'is-back-gesturing');
+      root.style.removeProperty('--back-progress');
+      document.querySelectorAll('.is-back-preview, .is-back-root').forEach((node) => {
+        node.classList.remove('is-back-preview', 'is-back-root', 'is-back-leaving');
+      });
+    }
   }, []);
 
   /**
@@ -494,7 +497,7 @@ function AppController() {
         </header>
 
         <main className="app-content">
-          <div className={`page-switch page-switch--${tabDirection}`} key={tab}>
+          <div className="page-switch" key={tab}>
             <Suspense fallback={<PageSkeleton />}>{renderPage()}</Suspense>
           </div>
         </main>

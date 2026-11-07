@@ -81,36 +81,21 @@
   padding: 8px 16px calc(160px + var(--safe-bottom));
 }
 
+/* Tab switches cross-fade the page. Deliberately no transform: moving the whole
+   page block reads as the page drifting (a fade plus a sideways slide looks like
+   a diagonal jump), and in a WebView a transformed ancestor also re-anchors any
+   fixed descendants for the duration. Direction is carried by the sliding tab
+   thumb instead, which cannot disturb layout. */
 .page-switch {
-  animation: page-in-from-right var(--slide-duration) var(--ease-out) both;
+  animation: page-fade-in var(--fade-duration) var(--ease-out) both;
 }
 
-.page-switch--backward {
-  animation-name: page-in-from-left;
-}
-
-/* Tab switches slide in the direction of travel. Pure translation: scaling a
-   tall page around its centre would drag the visible top edge sideways and
-   down, which reads as a stray offset rather than a page change. */
-@keyframes page-in-from-right {
+@keyframes page-fade-in {
   from {
     opacity: 0;
-    transform: translate3d(var(--slide-distance), 0, 0);
   }
   to {
     opacity: 1;
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes page-in-from-left {
-  from {
-    opacity: 0;
-    transform: translate3d(calc(var(--slide-distance) * -1), 0, 0);
-  }
-  to {
-    opacity: 1;
-    transform: translate3d(0, 0, 0);
   }
 }
 
@@ -167,6 +152,9 @@
 }
 
 .tabbar {
+  --pad-l: 8px;
+  --pad-r: 8px;
+
   position: relative;
   display: grid;
   width: 100%;
@@ -174,7 +162,7 @@
   height: var(--tabbar-height);
   grid-template-columns: repeat(3, 1fr);
   align-items: center;
-  padding: 6px 8px;
+  padding: 6px var(--pad-r) 6px var(--pad-l);
   border: 1px solid color-mix(in srgb, var(--line-strong) 76%, transparent);
   border-radius: 26px;
   background: var(--bar-surface);
@@ -183,14 +171,17 @@
   pointer-events: auto;
 }
 
-/* A single pill slides between the three tabs instead of each tab fading in. */
+/* A single pill slides between the three tabs instead of each tab fading in.
+   Its width is derived from the padding, not from `100% / 3`: `100%` resolves
+   against the padding box, so with a docked quick-add button reserving 66px on
+   the right the pill would be too wide and would drift past the last tab. */
 .tabbar__thumb {
   position: absolute;
   z-index: 0;
   top: 6px;
   bottom: 6px;
-  left: 8px;
-  width: calc((100% - 16px) / 3);
+  left: var(--pad-l);
+  width: calc((100% - var(--pad-l) - var(--pad-r)) / 3);
   border-radius: 18px;
   background: color-mix(in srgb, var(--accent-soft) 72%, transparent);
   transform: translateX(calc(var(--tab-index, 0) * 100%));

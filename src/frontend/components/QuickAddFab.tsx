@@ -75,24 +75,42 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
     findTabbar()?.classList.toggle('is-fab-drop-target', active);
   };
 
-  useLayoutEffect(() => {
+  const place = () => {
+    if (dragRef.current) return;
     const nav = findTabbar();
-    setPosition(docked && nav ? dockedPosition(nav) : floatingPosition(nav));
-  }, []);
+    if (!nav) return;
+    setPosition(docked ? dockedPosition(nav) : floatingPosition(nav));
+  };
+
+  useLayoutEffect(() => {
+    place();
+    // The tab bar's geometry changes when the button docks (its right slot opens
+    // up) and when the system reports its safe-area inset a frame late.
+    const nav = findTabbar();
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(() => place()) : null;
+    if (nav && observer) observer.observe(nav);
+    const raf = requestAnimationFrame(place);
+    const late = window.setTimeout(place, 350);
+    return () => {
+      observer?.disconnect();
+      cancelAnimationFrame(raf);
+      window.clearTimeout(late);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docked]);
 
   useEffect(() => {
     return () => setDropTargetClass(false);
   }, []);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (dragRef.current) return;
-      const nav = findTabbar();
-      if (!nav) return;
-      setPosition(docked ? dockedPosition(nav) : floatingPosition(nav));
+    window.addEventListener('resize', place);
+    window.visualViewport?.addEventListener('resize', place);
+    return () => {
+      window.removeEventListener('resize', place);
+      window.visualViewport?.removeEventListener('resize', place);
     };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docked]);
 
   const handlePointerDown = (event: ReactPointerEvent<HTMLButtonElement>) => {

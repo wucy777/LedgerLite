@@ -41,8 +41,10 @@
   outline-offset: 4px;
 }
 
+/* The docked button reserves its slot inside the bar; the three tabs (and the
+   sliding pill, which derives its width from --pad-r) narrow with it. */
 .tabbar.tabbar--fab-docked {
-  padding-right: 66px;
+  --pad-r: 74px;
 }
 
 .tabbar.is-fab-drop-target {
