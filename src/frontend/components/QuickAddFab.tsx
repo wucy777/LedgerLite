@@ -67,9 +67,16 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const dragRef = useRef<DragState | null>(null);
   const suppressClickRef = useRef(false);
+  /** Last committed spot, so a re-place never discards where the user dropped it. */
+  const positionRef = useRef<{ left: number; top: number } | null>(null);
   const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const [dropTarget, setDropTarget] = useState(false);
+
+  const applyPosition = (next: { left: number; top: number }) => {
+    positionRef.current = next;
+    setPosition(next);
+  };
 
   const setDropTargetClass = (active: boolean) => {
     findTabbar()?.classList.toggle('is-fab-drop-target', active);
@@ -79,7 +86,20 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
     if (dragRef.current) return;
     const nav = findTabbar();
     if (!nav) return;
-    setPosition(docked ? dockedPosition(nav) : floatingPosition(nav));
+    if (docked) {
+      applyPosition(dockedPosition(nav));
+      return;
+    }
+    // Undocked: keep the user's spot, only pulled back inside the viewport.
+    const current = positionRef.current;
+    applyPosition(
+      current
+        ? {
+            left: clamp(current.left, 8, window.innerWidth - FLOAT_SIZE - 8),
+            top: clamp(current.top, 8, window.innerHeight - FLOAT_SIZE - 8),
+          }
+        : floatingPosition(nav),
+    );
   };
 
   useLayoutEffect(() => {
@@ -197,10 +217,10 @@ export function QuickAddFab({ docked, onDockChange, onAdd }: QuickAddFabProps) {
 
     if (shouldDock && nav) {
       onDockChange(true);
-      setPosition(dockedPosition(nav));
+      applyPosition(dockedPosition(nav));
     } else {
       // `drag` holds the last painted position, so no state has to be read back.
-      setPosition({
+      applyPosition({
         left: clamp(drag.left, 8, window.innerWidth - FLOAT_SIZE - 8),
         top: clamp(drag.top, 8, window.innerHeight - FLOAT_SIZE - 8),
       });
