@@ -1,0 +1,27 @@
+node_modules/
+dist/
+coverage/
+*.local
+.env*
+!.env.example
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+android/capacitor-cordova-android-plugins/
+android/app/src/main/assets/public/
+android/app/src/main/assets/capacitor.config.json
+android/app/src/main/assets/capacitor.plugins.json
+_artifacts/
+_Document/
+_cache/
+_backup/
+_keys/
+*.jks
+# 发布签名密钥按项目约定随仓库公开（见 Document/android-signing.md）
+!android/keystore.properties
+!android/app/release.keystore
+.DS_Store
+Thumbs.db
+*.log

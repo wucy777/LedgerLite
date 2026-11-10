@@ -1,0 +1,139 @@
+/* Predictive back: the destination screen sits behind the app surface, and the
+   whole app surface lifts away from the left edge as the finger drags. Closing a
+   sheet instead previews that sheet leaving, with the page left in place. */
+
+.back-gesture {
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.back-gesture__panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  width: 100%;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  padding: calc(var(--safe-top) + 22px) 24px calc(var(--safe-bottom) + 22px) 26px;
+  color: var(--hero-ink);
+  background:
+    radial-gradient(90% 60% at 6% 12%, rgba(255, 255, 255, 0.1), transparent 62%),
+    linear-gradient(150deg, var(--hero-start), var(--hero-end));
+  /* The destination stays put, exactly like Android's predictive back: only the
+     foreground card moves. A little parallax is enough to feel alive. */
+  opacity: calc(0.35 + var(--back-progress, 0) * 0.65);
+  transform: translate3d(calc(var(--back-progress, 0) * 6%), 0, 0);
+  will-change: transform, opacity;
+}
+
+.back-gesture__label,
+.back-gesture__detail,
+.back-gesture__eyebrow {
+  max-width: 190px;
+}
+
+.back-gesture__eyebrow {
+  color: color-mix(in srgb, var(--hero-ink) 56%, transparent);
+  font-size: 9.5px;
+  font-weight: 650;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.back-gesture__label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 22px;
+  font-weight: 740;
+  letter-spacing: -0.02em;
+}
+
+.back-gesture__label svg {
+  color: var(--gold);
+}
+
+.back-gesture__detail {
+  color: color-mix(in srgb, var(--hero-ink) 66%, transparent);
+  font-size: 12px;
+  font-weight: 560;
+  line-height: 1.6;
+  letter-spacing: 0.02em;
+}
+
+.back-gesture__hint {
+  align-self: flex-start;
+  margin-top: 14px;
+  padding: 5px 12px;
+  color: color-mix(in srgb, var(--hero-ink) 74%, transparent);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease;
+}
+
+.back-gesture__hint.is-armed {
+  color: var(--hero-start);
+  border-color: transparent;
+  background: var(--gold);
+}
+
+/* The app surface becomes a card that lifts off the destination screen. Only a
+   page-level back does this; closing a sheet leaves the page in place. */
+.app__body {
+  position: relative;
+  z-index: 2;
+  transition:
+    transform 240ms var(--ease-out),
+    border-radius 240ms var(--ease-out);
+}
+
+:root.is-page-preview .app__body {
+  overflow: hidden;
+  border-radius: 0 30px 30px 0;
+  background: var(--bg);
+  box-shadow: var(--shadow-lg);
+  transform: translate3d(calc(var(--back-progress, 0) * 88%), 0, 0)
+    scale(calc(1 - var(--back-progress, 0) * 0.045));
+  transform-origin: 0% 50%;
+  transition: none;
+}
+
+/* An overlay that owns back previews its own dismissal: `usePredictiveBack`
+   writes `--sheet-progress` on the panel's container and `translate`/`scale` on
+   the panel itself. Both are inline styles, because React re-renders the sheet
+   when it starts closing and would drop a class added from the outside. */
+
+/* Bottom sheets peel downwards, centred panels follow the finger sideways. */
+.entry-sheet__panel,
+.settings-sheet,
+.ledger-picker-sheet {
+  transform-origin: 50% 100%;
+  will-change: translate, scale;
+}
+
+.date-picker__panel,
+.settings-dialog {
+  transform-origin: 0% 50%;
+  will-change: translate, scale;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app__body {
+    transition: none;
+  }
+
+  :root.is-page-preview .app__body {
+    transform: none;
+  }
+}

@@ -1,0 +1,152 @@
+:root {
+  color-scheme: light;
+
+  --font-sans: "Avenir Next", "SF Pro Text", "Segoe UI", "HarmonyOS Sans SC", "PingFang SC",
+    "Microsoft YaHei", system-ui, sans-serif;
+  --font-display: "Avenir Next", "SF Pro Display", "Segoe UI", "HarmonyOS Sans SC", "PingFang SC",
+    "Microsoft YaHei", system-ui, sans-serif;
+
+  --bg: #f3efe6;
+  --bg-soft: #ece6da;
+  --surface: #fffcf6;
+  --surface-raised: #fffefb;
+  --surface-muted: #f6f1e8;
+  --surface-strong: #ece5d8;
+  --ink: #1e241f;
+  --ink-soft: #586158;
+  --muted: #8b9187;
+  --faint: #aeb2aa;
+  --line: rgba(30, 36, 31, 0.08);
+  --line-strong: rgba(30, 36, 31, 0.14);
+
+  --accent: #2c4d39;
+  --accent-strong: #1c3526;
+  --accent-ink: #f7f3e8;
+  --accent-soft: #e2ebe1;
+  --accent-wash: rgba(44, 77, 57, 0.08);
+
+  --expense: #c35d46;
+  --expense-soft: #f8e7e0;
+  --income: #2c7857;
+  --income-soft: #e1efe7;
+  --gold: #b78a49;
+  --gold-soft: #f5ecda;
+  --danger: #b34536;
+  --danger-soft: #f9e7e3;
+
+  --hero-start: #2b4635;
+  --hero-end: #17271d;
+  --hero-ink: #f7f3e7;
+  --hero-muted: rgba(247, 243, 231, 0.6);
+  --hero-line: rgba(247, 243, 231, 0.12);
+
+  --shadow-xs: 0 1px 2px rgba(32, 38, 31, 0.04);
+  --shadow-sm: 0 2px 10px rgba(32, 38, 31, 0.05);
+  --shadow-md: 0 18px 50px -28px rgba(30, 40, 31, 0.32), 0 2px 8px rgba(30, 40, 31, 0.04);
+  --shadow-lg: 0 32px 80px -32px rgba(18, 27, 20, 0.45);
+  --shadow-hero: 0 30px 60px -32px rgba(18, 36, 24, 0.5);
+
+  --radius-xs: 10px;
+  --radius-sm: 14px;
+  --radius-md: 18px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-pill: 999px;
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.42, 0.64, 1);
+
+  --ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --dur-fast: 140ms;
+  --dur-base: 220ms;
+  --dur-slow: 380ms;
+
+  /* Backdrop blur is the single most expensive effect here: it re-filters the
+     page behind every fixed bar on each scroll frame. Overridable per profile. */
+  --blur-bar: blur(22px) saturate(1.2);
+  --blur-pill: blur(12px);
+  --blur-sheet: blur(4px);
+  /* The floating bars are glassy only while a blur is actually applied. */
+  --bar-surface: color-mix(in srgb, var(--surface) 82%, transparent);
+  /* Duration of a dragged thumb/slider following an index change. */
+  --scrub-duration: 260ms;
+  --scrub-ease: var(--ease-spring);
+  /* Page-level cross-fade when switching tabs (no transform, no layout shift). */
+  --fade-duration: 190ms;
+  /* Per-item delay for list reveals; capped by the consumer. */
+  --stagger: 40ms;
+
+  --safe-top: max(env(safe-area-inset-top, 0px), 12px);
+  /* Android WebViews often report a 0 bottom inset even when the gesture bar
+     overlaps the view, so a floor keeps the tab bar clear of it. */
+  --safe-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+
+  --tabbar-height: 66px;
+  --content-width: 780px;
+}
+
+/* High refresh rate profile: at 120 Hz a 220 ms fade spans 26 frames, so long
+   durations read as lag behind the finger. Shorten them, drop the overshoot on
+   sliders (tracking, not bouncing) and remove backdrop blur — a blurred fixed
+   bar re-filters the page on every scroll frame, which is what made scrolling
+   feel heavy even at a high refresh rate. */
+:root.is-high-refresh {
+  --dur-fast: 90ms;
+  --dur-base: 130ms;
+  --dur-slow: 210ms;
+  --ease-spring: cubic-bezier(0.2, 0.8, 0.3, 1);
+  --blur-bar: none;
+  --blur-pill: none;
+  --blur-sheet: none;
+  --bar-surface: var(--surface);
+  --scrub-duration: 120ms;
+  --scrub-ease: var(--ease-out);
+  --fade-duration: 120ms;
+  --stagger: 18ms;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --bg: #141814;
+    --bg-soft: #101410;
+    --surface: #1c221c;
+    --surface-raised: #222a22;
+    --surface-muted: #242b23;
+    --surface-strong: #2b332a;
+    --ink: #edf0e7;
+    --ink-soft: #b7beb2;
+    --muted: #8e978b;
+    --faint: #6f786d;
+    --line: rgba(237, 240, 231, 0.08);
+    --line-strong: rgba(237, 240, 231, 0.15);
+
+    --accent: #a7c9b2;
+    --accent-strong: #c0dac9;
+    --accent-ink: #14251a;
+    --accent-soft: #2b3d30;
+    --accent-wash: rgba(167, 201, 178, 0.08);
+
+    --expense: #df8a74;
+    --expense-soft: #35251f;
+    --income: #83c4a4;
+    --income-soft: #1d3025;
+    --gold: #d0ab6d;
+    --gold-soft: #332b1e;
+    --danger: #e08b7a;
+    --danger-soft: #37231f;
+
+    --hero-start: #243b2c;
+    --hero-end: #121d16;
+    --hero-ink: #f4f1e6;
+    --hero-muted: rgba(244, 241, 230, 0.6);
+    --hero-line: rgba(244, 241, 230, 0.12);
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+    --shadow-sm: 0 2px 10px rgba(0, 0, 0, 0.18);
+    --shadow-md: 0 18px 50px -28px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.2);
+    --shadow-lg: 0 32px 80px -32px rgba(0, 0, 0, 0.8);
+    --shadow-hero: 0 30px 60px -32px rgba(0, 0, 0, 0.75);
+  }
+}

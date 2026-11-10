@@ -1,0 +1,163 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Keeps the Releases page to a single, current entry: every older release,
+      # the debug asset they carried, and their tags are removed with the workflow
+      # token, which is the only credential available to CI.
+      - name: Clean superseded releases
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -o pipefail
+          REPO="${{ github.repository }}"
+          KEEP="v$(node -p "require('./package.json').version")"
+          echo "Keeping $KEEP"
+
+          gh api "repos/$REPO/releases" --paginate --jq '.[] | "\(.id) \(.tag_name)"' |
+            while read -r id tag; do
+              if [ "$tag" != "$KEEP" ]; then
+                echo "Deleting release $tag ($id)"
+                gh api -X DELETE "repos/$REPO/releases/$id" || true
+              fi
+            done
+
+          gh api "repos/$REPO/releases/tags/$KEEP" --jq '.assets[] | select(.name | endswith("app-debug.apk")) | .id' 2>/dev/null |
+            while read -r asset; do
+              [ -n "$asset" ] && echo "Deleting asset $asset" && gh api -X DELETE "repos/$REPO/releases/assets/$asset" || true
+            done
+
+          gh api "repos/$REPO/git/refs/tags" --paginate --jq '.[] | .ref' |
+            while read -r ref; do
+              short="${ref#refs/}"
+              if [ "$short" != "tags/$KEEP" ]; then
+                echo "Deleting $ref"
+                gh api -X DELETE "repos/$REPO/git/refs/$short" || true
+              fi
+            done
+
+          # The release tag must point at the commit we just built, even though the
+          # history was rewritten and the old tag survived the delete loop.
+          gh api -X PATCH "repos/$REPO/git/refs/tags/$KEEP" -f sha="$GITHUB_SHA" -F force=true >/dev/null
+          echo "Moved $KEEP to $GITHUB_SHA"
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          accept-android-sdk-licenses: false
+          packages: platform-tools
+
+      - name: Install Android platform
+        run: |
+          yes | sdkmanager --licenses >/dev/null 2>&1 || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.14.3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build web app
+        run: npm run build:web
+
+      - name: Sync Capacitor Android
+        run: npx cap sync android
+
+      - name: Read version
+        id: meta
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          if [[ "$VERSION" == *-* ]]; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "Building $VERSION"
+
+      - name: Build APK
+        working-directory: android
+        run: |
+          set -o pipefail
+          chmod +x gradlew
+          LOG=/tmp/gradle.log
+          : > "$LOG"
+
+          # The wrapper pulls its Gradle distribution on first use; if that host
+          # is unreachable on this runner, fall back to the preinstalled Gradle.
+          # setup-gradle provisions an exact Gradle version; the wrapper's own
+          # distribution download is flaky on this runner image.
+          GRADLE_CMD=gradle
+          chmod +x gradlew 2>/dev/null || true
+          $GRADLE_CMD --version >>"$LOG" 2>&1 || true
+
+          if [ -f keystore.properties ]; then
+            echo "Signed release build"
+            TASK=assembleRelease
+          else
+            echo "No keystore.properties: building a debug APK"
+            TASK=assembleDebug
+          fi
+
+          if ! $GRADLE_CMD $TASK --no-daemon --stacktrace >>"$LOG" 2>&1; then
+            MSG=$(tail -c 3000 "$LOG" | tr '\n' '|')
+            echo "::error title=Gradle failure::$MSG"
+            exit 1
+          fi
+      - name: Rename APK
+        run: |
+          APK=$(find android/app/build/outputs/apk -name '*.apk' | head -n 1)
+          echo "APK: $APK"
+          cp "$APK" "$GITHUB_WORKSPACE/LedgerLite-${{ steps.meta.outputs.version }}.apk"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LedgerLite-apk
+          path: LedgerLite-*.apk
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Publish APK release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.meta.outputs.version }}
+          name: LedgerLite ${{ steps.meta.outputs.version }}
+          body: |
+            自动构建的 Android APK（版本 ${{ steps.meta.outputs.version }}）。
+          files: LedgerLite-*.apk
+          prerelease: ${{ steps.meta.outputs.prerelease == 'true' }}
